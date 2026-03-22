@@ -2,7 +2,7 @@
 
 A Microsoft Word task pane add-in for creating and filling document templates. Build templates from existing docs, then fill them — all inside Word with no server required.
 
-**Live add-in:** https://boisterous-dolphin-c2960c.netlify.app
+**Live add-in:** https://docfill.pages.dev
 **GitHub:** https://github.com/gardead23/docfill
 
 ---
@@ -96,7 +96,7 @@ For Microsoft 365 organizations, an admin can deploy centrally:
 
 ```
 docfill/
-├── manifest.xml      ← Office add-in descriptor (points to Netlify URL)
+├── manifest.xml      ← Office add-in descriptor (points to Cloudflare Pages URL)
 ├── taskpane.html     ← task pane UI
 ├── taskpane.css      ← styles
 ├── taskpane.js       ← all add-in logic (scan, fill, reset, create, localStorage)
@@ -112,16 +112,7 @@ docfill/
 
 ## Development & Deployment
 
-The add-in is hosted on Netlify. To deploy changes:
-
-```bash
-cd docfill
-zip -r deploy.zip taskpane.html taskpane.js taskpane.css manifest.xml commands.html icon-16.png icon-32.png icon-80.png
-curl -X POST "https://api.netlify.com/api/v1/sites/036b0e4d-dd56-4f26-92b5-52d6ccfb2192/deploys" \
-  -H "Authorization: Bearer <NETLIFY_TOKEN>" \
-  -H "Content-Type: application/zip" \
-  --data-binary @deploy.zip && rm deploy.zip
-```
+The add-in is hosted on Cloudflare Pages, connected to the `gardead23/docfill` GitHub repo. Deployments are automatic — every push to `main` deploys to https://docfill.pages.dev.
 
 For local testing, serve the files over localhost:
 ```bash

@@ -2,8 +2,8 @@
 
 Microsoft Word task pane add-in. Pure static files, no build step. Hosted on Netlify.
 
-**Live URL:** https://boisterous-dolphin-c2960c.netlify.app
-**Netlify site ID:** `036b0e4d-dd56-4f26-92b5-52d6ccfb2192`
+**Live URL:** https://docfill.pages.dev
+**Hosting:** Cloudflare Pages — auto-deploys on push to `main` (repo: `gardead23/docfill`)
 
 ## Architecture
 
@@ -111,15 +111,7 @@ Field labels and types are saved keyed by the sorted+joined set of placeholder k
 
 ## Deployment
 
-Deploy via Netlify REST API (zip upload):
-```bash
-cd docfill
-zip -r deploy.zip taskpane.html taskpane.js taskpane.css manifest.xml commands.html icon-16.png icon-32.png icon-80.png
-curl -X POST "https://api.netlify.com/api/v1/sites/036b0e4d-dd56-4f26-92b5-52d6ccfb2192/deploys" \
-  -H "Authorization: Bearer $NETLIFY_TOKEN" \
-  -H "Content-Type: application/zip" \
-  --data-binary @deploy.zip
-```
+Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys automatically to https://docfill.pages.dev — no manual deploy step needed.
 
 ## Office.js Gotchas
 

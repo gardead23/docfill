@@ -11,9 +11,9 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DocFill"/>
   <Description DefaultValue="Fill {{placeholders}} in your Word templates with a simple form."/>
-  <IconUrl DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/icon-80.png"/>
-  <SupportUrl DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/taskpane.html"/>
+  <IconUrl DefaultValue="https://docfill.pages.dev/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://docfill.pages.dev/icon-80.png"/>
+  <SupportUrl DefaultValue="https://docfill.pages.dev/taskpane.html"/>
 
   <Hosts>
     <Host Name="Document"/>
@@ -26,7 +26,7 @@
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/taskpane.html"/>
+    <SourceLocation DefaultValue="https://docfill.pages.dev/taskpane.html"/>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -70,13 +70,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/icon-80.png"/>
+        <bt:Image id="Icon.16" DefaultValue="https://docfill.pages.dev/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://docfill.pages.dev/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://docfill.pages.dev/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/commands.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://boisterous-dolphin-c2960c.netlify.app/taskpane.html"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://docfill.pages.dev/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://docfill.pages.dev/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Group.Label" DefaultValue="DocFill"/>
