@@ -86,7 +86,7 @@ For Microsoft 365 organizations, an admin can deploy centrally:
 | Type | Input | Inserted as |
 |---|---|---|
 | Text | Single-line input | Value as-is |
-| Date | Date picker + format selector | Formatted date (see below) |
+| Date | Flatpickr date picker + format selector | Formatted date (see below) |
 | Long text | Multi-line textarea | Value as-is |
 
 ### Date Formats

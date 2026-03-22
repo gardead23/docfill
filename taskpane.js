@@ -198,15 +198,53 @@ function renderForm(fields) {
 
     // Restore filled value and show reset button if this field has been filled
     if (lastFilledValues[field.key]) {
-      const input = row.querySelector(".field-value-input, .field-value-textarea");
-      if (input) input.value = lastFilledValues[field.key];
+      if (field.type !== "date") {
+        const input = row.querySelector(".field-value-input, .field-value-textarea");
+        if (input) input.value = lastFilledValues[field.key];
+      }
       const resetBtn = document.getElementById(`reset-btn-${field.key}`);
       if (resetBtn) resetBtn.style.display = "inline-flex";
     }
   });
 
+  // Initialize flatpickr on all date inputs
+  initFlatpickrAll();
+
   // Show global date format selector if any date fields exist
   renderGlobalDateFormat(fields);
+}
+
+/** Initialize flatpickr on all date inputs that haven't been initialized yet. */
+function initFlatpickrAll() {
+  document.querySelectorAll(".flatpickr-date").forEach((el) => {
+    if (el._flatpickr) return; // already initialized
+    flatpickr(el, {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "F j, Y",
+      disableMobile: true,
+      appendTo: el.closest(".field-row") || undefined,
+    });
+  });
+}
+
+/** Initialize flatpickr on a single element by field key. */
+function initFlatpickrForField(key) {
+  const el = document.getElementById(`val-${key}`);
+  if (!el || el._flatpickr) return;
+  flatpickr(el, {
+    dateFormat: "Y-m-d",
+    altInput: true,
+    altFormat: "F j, Y",
+    disableMobile: true,
+    appendTo: el.closest(".field-row") || undefined,
+  });
+}
+
+/** Destroy flatpickr instance on a field if it exists. */
+function destroyFlatpickr(key) {
+  const el = document.getElementById(`val-${key}`);
+  if (el && el._flatpickr) el._flatpickr.destroy();
 }
 
 function renderGlobalDateFormat(fields) {
@@ -247,8 +285,10 @@ function buildValueInput(field) {
     const fieldFmt = field.dateFormat || "";
     return `<input
       id="${id}"
-      class="field-value-input"
-      type="date"
+      class="field-value-input flatpickr-date"
+      type="text"
+      placeholder="Select date..."
+      readonly
     />
     <select
       class="date-format-select"
@@ -275,6 +315,8 @@ function setFieldType(key, newType) {
   if (!field || field.type === newType) return;
 
   const oldValue = document.getElementById(`val-${key}`)?.value || "";
+  // Destroy flatpickr before removing DOM elements
+  destroyFlatpickr(key);
   field.type = newType;
   if (newType !== "date") delete field.dateFormat;
   saveFieldConfigs(currentStorageKey, currentFields);
@@ -282,10 +324,12 @@ function setFieldType(key, newType) {
   // Rebuild the value input
   const row = document.querySelector(`.field-row[data-key="${key}"]`);
   if (!row) return;
-  // Remove old input + date format select if present
-  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-format-select").forEach((el) => el.remove());
+  // Remove old input + date format select + any flatpickr alt input
+  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-format-select, .flatpickr-date").forEach((el) => el.remove());
   row.insertAdjacentHTML("beforeend", buildValueInput(field));
-  if (newType !== "date") {
+  if (newType === "date") {
+    initFlatpickrForField(key);
+  } else {
     const newInput = row.querySelector(".field-value-input, .field-value-textarea");
     if (newInput) newInput.value = oldValue;
   }

@@ -237,6 +237,105 @@ main {
   gap: 6px;
 }
 
+/* ── Flatpickr overrides ── */
+.flatpickr-calendar {
+  font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #e5e7eb;
+  width: 260px;
+}
+
+.flatpickr-months {
+  padding: 4px 0;
+}
+
+.flatpickr-months .flatpickr-month {
+  height: 32px;
+}
+
+.flatpickr-current-month {
+  font-size: 12px;
+  font-weight: 600;
+  padding-top: 4px;
+}
+
+.flatpickr-current-month .numInputWrapper {
+  width: 5ch;
+}
+
+.flatpickr-current-month input.cur-year {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.flatpickr-day {
+  max-width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.flatpickr-day:hover {
+  background: #eff6ff;
+  border-color: #eff6ff;
+}
+
+.flatpickr-day.today:not(.selected) {
+  border-color: #2563eb;
+}
+
+span.flatpickr-weekday {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+  padding: 6px 8px;
+}
+
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Alt input styling — flatpickr creates this as a visible input */
+.field-row input.flatpickr-date + input.form-control,
+.field-row input.flatpickr-date + input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  color: #111827;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #f9fafb;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.field-row input.flatpickr-date + input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px #2563eb18;
+}
+
+/* Hide the original input since flatpickr uses altInput */
+input.flatpickr-date[readonly] {
+  display: none;
+}
+
 /* ── Global date format ── */
 #global-date-format {
   display: flex;
