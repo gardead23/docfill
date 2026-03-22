@@ -1,6 +1,6 @@
 # DocFill — Word Add-In
 
-Microsoft Word task pane add-in. Pure static files, no build step. Hosted on Netlify.
+Microsoft Word task pane add-in. Pure static files, no build step. Hosted on Cloudflare Pages.
 
 **Live URL:** https://docfill.pages.dev
 **Hosting:** Cloudflare Pages — auto-deploys on push to `main` (repo: `gardead23/docfill`)
@@ -10,7 +10,7 @@ Microsoft Word task pane add-in. Pure static files, no build step. Hosted on Net
 - `taskpane.html` — task pane shell, loads Office.js from CDN
 - `taskpane.js` — all add-in logic (scan, render, fill, reset, create, localStorage)
 - `taskpane.css` — styles
-- `manifest.xml` — Office add-in descriptor pointing to Netlify URL
+- `manifest.xml` — Office add-in descriptor pointing to Cloudflare Pages URL
 - `commands.html` — required empty shell for Office command surface
 
 ## UI Structure
