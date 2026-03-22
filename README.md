@@ -1,6 +1,6 @@
 # DocFill — Word Add-In
 
-A Microsoft Word task pane add-in that detects `{{placeholders}}` in your document templates and fills them with a clean sidebar form. No apps to switch to, no server required — everything happens inside Word.
+A Microsoft Word task pane add-in for creating and filling document templates. Build templates from existing docs, then fill them — all inside Word with no server required.
 
 **Live add-in:** https://boisterous-dolphin-c2960c.netlify.app
 **GitHub:** https://github.com/gardead23/docfill
@@ -9,14 +9,24 @@ A Microsoft Word task pane add-in that detects `{{placeholders}}` in your docume
 
 ## How It Works
 
+### Filling a template
+
 1. Add `{{placeholder_name}}` markers anywhere in your Word document
 2. Open the DocFill task pane (Home ribbon → **DocFill** button)
-3. Click **Scan Document** — the add-in detects all placeholders
+3. Go to the **Fill** tab and click **Scan Document** — the add-in detects all placeholders
 4. Customize labels and field types (Text, Date, Number, Long text) if needed
 5. Fill in the values
 6. Click **Fill Document** — all placeholders are replaced instantly
 
 Labels and field types are remembered the next time you open the same template.
+
+### Creating a template from an existing document
+
+1. Open the DocFill task pane and go to the **Create** tab
+2. Select any text in your document — the task pane shows a live preview of your selection
+3. Type a placeholder name (auto-suggested from the selected text) and click **Replace with Placeholder**
+4. Repeat for every piece of text you want to turn into a field
+5. Click **Done — Fill This Template** to switch to the Fill tab and fill it immediately
 
 ---
 
@@ -89,7 +99,7 @@ docfill/
 ├── manifest.xml      ← Office add-in descriptor (points to Netlify URL)
 ├── taskpane.html     ← task pane UI
 ├── taskpane.css      ← styles
-├── taskpane.js       ← all add-in logic (scan, fill, reset, localStorage)
+├── taskpane.js       ← all add-in logic (scan, fill, reset, create, localStorage)
 ├── commands.html     ← required Office command surface shell
 ├── icon-16.png       ← ribbon icons
 ├── icon-32.png
@@ -124,11 +134,15 @@ Then update `<SourceLocation>` in `manifest.xml` to `http://localhost:3000/taskp
 
 ## Tips
 
+- **Create tab:** Select text in your doc, give it a name, and DocFill replaces it with a `{{placeholder}}` — builds your template without typing brackets manually
+- **Multiple occurrences:** When you replace text that appears more than once, you can replace just the first instance or all of them at once
+- **Navigate placeholders:** In Create mode, click any chip in "Created so far" to highlight that placeholder in the document; click again to cycle through multiple occurrences
 - **Re-fill:** Change a value and click Fill Document again — it updates the document without needing to clear first
 - **Per-field undo:** Click the ↺ icon on any filled field to restore just that placeholder
-- **Full reset:** Click **Clear all fields** → **Reset Document** to restore the original template
+- **Full reset:** Click **Clear all fields** → **Reset Document** to restore the original template (including any text you added around placeholders after scanning)
 - **Rescan:** Click **↺ Rescan** to pick up any new placeholders added to the document
 - **Labels are saved** per template shape — your customizations persist across sessions
+- **Duplicate values blocked:** If two fields have the same value, Fill Document will stop and tell you which fields conflict
 
 ---
 
