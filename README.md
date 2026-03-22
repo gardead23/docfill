@@ -1,15 +1,18 @@
-# Template Filler — Word Add-In
+# DocFill — Word Add-In
 
-A simple Word task pane add-in that detects `{{placeholders}}` in your document and fills them with a clean form. No apps to switch to, no server required — everything happens inside Word.
+A Microsoft Word task pane add-in that detects `{{placeholders}}` in your document templates and fills them with a clean sidebar form. No apps to switch to, no server required — everything happens inside Word.
+
+**Live add-in:** https://boisterous-dolphin-c2960c.netlify.app
+**GitHub:** https://github.com/gardead23/docfill
 
 ---
 
 ## How It Works
 
 1. Add `{{placeholder_name}}` markers anywhere in your Word document
-2. Open the Template Filler task pane
+2. Open the DocFill task pane (Home ribbon → **DocFill** button)
 3. Click **Scan Document** — the add-in detects all placeholders
-4. Customize labels and field types (Text, Date, Number, Paragraph) if needed
+4. Customize labels and field types (Text, Date, Number, Long text) if needed
 5. Fill in the values
 6. Click **Fill Document** — all placeholders are replaced instantly
 
@@ -21,7 +24,6 @@ Labels and field types are remembered the next time you open the same template.
 
 Use `{{snake_case_name}}` syntax. Only letters, numbers, and underscores.
 
-Examples:
 ```
 {{client_name}}       → auto-labeled "Client Name"
 {{start_date}}        → auto-labeled "Start Date"
@@ -31,103 +33,105 @@ Examples:
 
 ---
 
-## Setup
+## Sideloading the Add-In
 
-### Step 1: Host the add-in files
+The add-in is already hosted and live — you just need to sideload `manifest.xml` into Word once.
 
-The add-in files (`taskpane.html`, `taskpane.css`, `taskpane.js`) must be served over HTTPS (or localhost for testing).
-
-**Option A — Local testing (localhost)**
-```bash
-cd template-filler
-npx serve .
-# → Serving at http://localhost:3000
-```
-The `manifest.xml` already points to `http://localhost:3000/taskpane.html` for local testing.
-
-**Option B — GitHub Pages (recommended for team sharing)**
-1. Push the `template-filler` folder to a GitHub repository
-2. Go to Settings → Pages → Deploy from branch (`main`, `/root`)
-3. Note your GitHub Pages URL (e.g. `https://yourusername.github.io/template-filler/`)
-4. Edit `manifest.xml` and update the `<SourceLocation>` URL:
-   ```xml
-   <SourceLocation DefaultValue="https://yourusername.github.io/template-filler/taskpane.html"/>
-   ```
-5. Share the updated `manifest.xml` with your team
-
----
-
-### Step 2: Sideload the add-in into Word
-
-#### Mac (Word for Mac)
+### Mac (Word for Mac)
 
 1. Open Word
 2. Go to **Insert → Add-ins → My Add-ins**
-3. Click **"..."** (three dots) → **Upload My Add-in**
-4. Select `manifest.xml`
-5. The "Template Filler" button appears in your ribbon under **Home**
+3. Click **"..."** → **Upload My Add-in**
+4. Select `manifest.xml` from this repo
+5. The **DocFill** button appears in your Home ribbon
 
-#### Windows (Word for Windows)
+### Windows (Word for Windows)
 
-**Option A — Upload directly (Microsoft 365 subscribers):**
-1. Open Word
-2. Go to **Insert → Get Add-ins → My Add-ins → Upload My Add-in**
-3. Select `manifest.xml`
+**Option A — Upload directly (Microsoft 365):**
+1. Open Word → **Insert → Get Add-ins → My Add-ins → Upload My Add-in**
+2. Select `manifest.xml`
 
 **Option B — Shared folder catalog:**
-1. Put `manifest.xml` in a shared network folder (e.g. `\\server\addins\`)
-2. In Word: **File → Options → Trust Center → Trust Center Settings → Trusted Add-in Catalogs**
-3. Add the folder path, check "Show in Menu"
-4. Restart Word
-5. **Insert → My Add-ins** → find Template Filler in the catalog
-
----
-
-### Step 3: Open the task pane
-
-After sideloading, a **Template Filler** button will appear in the Home ribbon. Click it to open the task pane.
+1. Put `manifest.xml` in a shared network folder
+2. Word: **File → Options → Trust Center → Trust Center Settings → Trusted Add-in Catalogs**
+3. Add the folder path, check "Show in Menu", restart Word
+4. **Insert → My Add-ins** → select DocFill
 
 ---
 
 ## Team Deployment
 
-For a small team, the simplest setup is:
-1. Host on GitHub Pages (free HTTPS)
-2. Share `manifest.xml` with each team member — they sideload once
-3. Everyone accesses the same hosted add-in files
+For a small team:
+1. Each member downloads `manifest.xml` from this repo and sideloads it once
+2. Everyone uses the same hosted add-in — no local files needed after that
 
-For Microsoft 365 organizations, an admin can deploy the add-in centrally:
-- Microsoft 365 Admin Center → Settings → Integrated apps → Upload custom app
-- All users get the add-in automatically — no sideloading needed
+For Microsoft 365 organizations, an admin can deploy centrally:
+- **Microsoft 365 Admin Center → Settings → Integrated apps → Upload custom app**
+- All users get the add-in automatically, no sideloading required
+
+---
+
+## Field Types
+
+| Type | Input | Inserted as |
+|---|---|---|
+| Text | Single-line input | Value as-is |
+| Date | Date picker | "March 20, 2026" |
+| Number | Number input | Value as-is |
+| Long text | Multi-line textarea | Value as-is |
 
 ---
 
 ## File Structure
 
 ```
-template-filler/
-├── manifest.xml      ← Office add-in descriptor (update SourceLocation URL)
+docfill/
+├── manifest.xml      ← Office add-in descriptor (points to Netlify URL)
 ├── taskpane.html     ← task pane UI
 ├── taskpane.css      ← styles
-├── taskpane.js       ← all add-in logic
+├── taskpane.js       ← all add-in logic (scan, fill, reset, localStorage)
+├── commands.html     ← required Office command surface shell
+├── icon-16.png       ← ribbon icons
+├── icon-32.png
+├── icon-80.png
+├── CLAUDE.md         ← architectural notes and dev conventions
 └── README.md
 ```
 
 ---
 
-## Tips
+## Development & Deployment
 
-- **Undo**: If you fill and want to start over, use **Ctrl+Z** (Mac: **Cmd+Z**) to undo all replacements
-- **Rescan**: If you add new placeholders to the document, click **↺ Rescan** to detect them
-- **Field types**:
-  - **Text** — plain text input
-  - **Date** — date picker, inserts as "March 20, 2026"
-  - **Number** — number input
-  - **Paragraph** — multi-line text area
-- **Labels are saved** per template (based on its placeholder set) — your customizations are remembered
+The add-in is hosted on Netlify. To deploy changes:
+
+```bash
+cd docfill
+zip -r deploy.zip taskpane.html taskpane.js taskpane.css manifest.xml commands.html icon-16.png icon-32.png icon-80.png
+curl -X POST "https://api.netlify.com/api/v1/sites/036b0e4d-dd56-4f26-92b5-52d6ccfb2192/deploys" \
+  -H "Authorization: Bearer <NETLIFY_TOKEN>" \
+  -H "Content-Type: application/zip" \
+  --data-binary @deploy.zip && rm deploy.zip
+```
+
+For local testing, serve the files over localhost:
+```bash
+npx serve .
+# → http://localhost:3000
+```
+Then update `<SourceLocation>` in `manifest.xml` to `http://localhost:3000/taskpane.html` and re-sideload.
 
 ---
 
-## Coming Soon
+## Tips
 
-- AI-assisted filling: paste an email or brief and Claude extracts the field values automatically
+- **Re-fill:** Change a value and click Fill Document again — it updates the document without needing to clear first
+- **Per-field undo:** Click the ↺ icon on any filled field to restore just that placeholder
+- **Full reset:** Click **Clear all fields** → **Reset Document** to restore the original template
+- **Rescan:** Click **↺ Rescan** to pick up any new placeholders added to the document
+- **Labels are saved** per template shape — your customizations persist across sessions
+
+---
+
+## Roadmap
+
+- [ ] **AI-assisted filling** — paste an email or brief and Claude extracts field values automatically, populating the form for review before filling
