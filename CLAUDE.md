@@ -109,6 +109,32 @@ When `scanDocument()` runs, for any key that appears as `{{placeholder}}` in the
 ### localStorage persistence
 Field labels and types are saved keyed by the sorted+joined set of placeholder keys. Same template shape → same configs on next open. Prefix: `template-filler:` (kept as-is to avoid breaking existing data).
 
+## Icons
+
+Source file: `DocFill Icon.png` (1080×1080, RGBA, transparent background).
+
+To regenerate `icon-16.png`, `icon-32.png`, `icon-80.png` from the source:
+
+```bash
+python3 << 'EOF'
+from PIL import Image
+
+src = "DocFill Icon.png"
+img = Image.open(src).convert("RGBA")
+img = img.crop(img.getbbox())  # trim transparent borders
+w, h = img.size
+size = max(w, h)
+square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+square.paste(img, ((size - w) // 2, (size - h) // 2), img)
+
+for out_size, name in [(16, "icon-16.png"), (32, "icon-32.png"), (80, "icon-80.png")]:
+    square.resize((out_size, out_size), Image.LANCZOS).save(name)
+    print(f"Saved {name}")
+EOF
+```
+
+Requires Pillow (`pip3 install Pillow`).
+
 ## Deployment
 
 Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys automatically to https://docfill.smplhq.com — no manual deploy step needed.
