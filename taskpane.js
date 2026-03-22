@@ -281,9 +281,39 @@ async function fillDocument() {
     document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
   });
 
-  // Detect if two re-filled fields share the same value (Phase 1 may confuse them)
-  const refillVals = Object.entries(toFill).filter(([k]) => lastFilledValues[k]).map(([, v]) => v);
-  const hasDuplicateRefillValues = refillVals.some((v, i) => refillVals.indexOf(v) !== i);
+  // Block fill if any two fields share the same value (breaks two-phase re-fill)
+  const valueToKeys = {};
+  for (const [k, v] of Object.entries(toFill)) {
+    if (!valueToKeys[v]) valueToKeys[v] = [];
+    valueToKeys[v].push(k);
+  }
+  const duplicateGroups = Object.values(valueToKeys).filter((ks) => ks.length > 1);
+  if (duplicateGroups.length > 0) {
+    const desc = duplicateGroups.map((ks) => {
+      const labels = ks.map((k) => currentFields.find((f) => f.key === k)?.label || k);
+      return labels.join(" and ");
+    }).join("; ");
+    showStatus(
+      `Two fields can't have the same value (${desc}). Use a single placeholder for repeated text, or enter different values.`,
+      "error"
+    );
+    duplicateGroups.flat().forEach((key) => {
+      document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
+    });
+    return;
+  }
+
+  // Re-capture OOXML right before the first fill so it includes any text
+  // the user added to the document after the last scan
+  if (Object.keys(lastFilledValues).length === 0) {
+    try {
+      await Word.run(async (context) => {
+        const ooxmlResult = context.document.body.getOoxml();
+        await context.sync();
+        originalOoxml = ooxmlResult.value;
+      });
+    } catch { /* keep existing snapshot */ }
+  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Filling...';
@@ -333,8 +363,6 @@ async function fillDocument() {
           .map((k) => currentFields.find((f) => f.key === k)?.label || k)
           .join(", ");
         showStatus(`✓ Done. Highlighted fields were skipped: ${skipped}`, "info");
-      } else if (hasDuplicateRefillValues) {
-        showStatus("✓ Filled. Note: some fields shared the same value — if anything looks mixed up, clear all fields and re-fill.", "info");
       } else {
         showStatus("✓ All fields filled successfully.", "success");
       }
@@ -766,6 +794,13 @@ async function navigateToChip(name) {
       if (results.items.length === 0) {
         showCreateStatus(`{{${name}}} not found — it may have been filled or removed.`, "error");
         return;
+      }
+
+      // Sync count if doc has more/fewer occurrences than tracked (e.g. user added one manually)
+      const entry = createdPlaceholders.find((e) => e.name === name);
+      if (entry && entry.count !== results.items.length) {
+        entry.count = results.items.length;
+        renderCreatedList();
       }
 
       const targetIdx = idx % results.items.length;
