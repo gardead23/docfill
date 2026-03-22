@@ -547,6 +547,19 @@ footer#actions {
   border: 1px solid #bfdbfe;
   border-radius: 5px;
   padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-count {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #e5e7eb;
+  border-radius: 3px;
+  padding: 0 4px;
 }
 
 /* ── Done Button ── */

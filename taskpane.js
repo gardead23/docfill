@@ -17,11 +17,10 @@ let lastFilledValues = {};
 let activeTab = "fill";
 let lastSelectedText = "";
 let lastSuggestedName = "";
-/** @type {string[]} */
+/** @type {{ name: string, count: number }[]} */
 let createdPlaceholders = [];
 let pendingCreateText = "";
 let pendingCreateName = "";
-let suppressReplaceAllConfirm = localStorage.getItem("template-filler:suppressReplaceAllConfirm") === "true";
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
 
@@ -48,14 +47,22 @@ async function scanDocument() {
       const ooxmlResult = body.getOoxml();
       body.load("text");
       await context.sync();
-      // Only freeze the original snapshot before any fills happen
-      if (Object.keys(lastFilledValues).length === 0) {
-        originalOoxml = ooxmlResult.value;
-      }
 
       const raw = body.text || "";
       const matches = raw.match(/\{\{(\w+)\}\}/g) || [];
       const docKeys = [...new Set(matches)].map((m) => m.replace(/\{\{|\}\}/g, ""));
+
+      // Sync state with doc: if a key appears as a {{placeholder}} it wasn't filled
+      // (or was undone via Ctrl+Z). Remove it from tracking so Phase 1 won't mis-restore.
+      for (const key of docKeys) {
+        delete lastFilledValues[key];
+      }
+      if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
+
+      // Freeze OOXML snapshot when nothing is filled (or everything was undone)
+      if (Object.keys(lastFilledValues).length === 0) {
+        originalOoxml = ooxmlResult.value;
+      }
 
       // Merge with previously filled fields so they stay visible in the form
       const filledNotInDoc = Object.keys(lastFilledValues).filter((k) => !docKeys.includes(k));
@@ -86,7 +93,7 @@ async function scanDocument() {
 
       saveFieldConfigs(currentStorageKey, currentFields);
       renderForm(currentFields);
-      if (Object.keys(lastFilledValues).length > 0) hasFilled = true;
+      if (Object.keys(lastFilledValues).length > 0) hasFilled = true; // may still be true for partial fills
       hideStatus();
     });
   } catch (err) {
@@ -272,6 +279,10 @@ async function fillDocument() {
     document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
   });
 
+  // Detect if two re-filled fields share the same value (Phase 1 may confuse them)
+  const refillVals = Object.entries(toFill).filter(([k]) => lastFilledValues[k]).map(([, v]) => v);
+  const hasDuplicateRefillValues = refillVals.some((v, i) => refillVals.indexOf(v) !== i);
+
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Filling...';
   hideStatus();
@@ -320,6 +331,8 @@ async function fillDocument() {
           .map((k) => currentFields.find((f) => f.key === k)?.label || k)
           .join(", ");
         showStatus(`✓ Done. Highlighted fields were skipped: ${skipped}`, "info");
+      } else if (hasDuplicateRefillValues) {
+        showStatus("✓ Filled. Note: some fields shared the same value — if anything looks mixed up, clear all fields and re-fill.", "info");
       } else {
         showStatus("✓ All fields filled successfully.", "success");
       }
@@ -447,7 +460,6 @@ function doFormClear() {
 // ── localStorage ───────────────────────────────────────────────────────────────
 
 const LS_PREFIX = "template-filler:";
-const LS_SUPPRESS_KEY = LS_PREFIX + "suppressReplaceAllConfirm";
 
 function buildStorageKey(keys) {
   return LS_PREFIX + [...keys].sort().join(",");
@@ -624,7 +636,7 @@ async function createPlaceholder() {
         return;
       }
 
-      if (occurrenceCount > 1 && !suppressReplaceAllConfirm) {
+      if (occurrenceCount > 1) {
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
@@ -652,10 +664,10 @@ async function createPlaceholder() {
 function showReplaceAllConfirm(count, name) {
   const el = document.getElementById("create-status");
   el.innerHTML = `
-    <div style="margin-bottom:8px">Found <strong>${count} occurrences</strong> of this text. Replace all with <code>{{${escapeHtml(name)}}}</code>?</div>
+    <div style="margin-bottom:8px">Found <strong>${count} occurrences</strong> of this text. Replace with <code>{{${escapeHtml(name)}}}</code>?</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button onclick="confirmReplaceAll(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">Replace all</button>
-      <button onclick="confirmReplaceAll(true)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;min-width:80px;opacity:0.75">Replace, don't ask again</button>
+      <button onclick="confirmReplace(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">This word only</button>
+      <button onclick="confirmReplace(true)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">All ${count} occurrences</button>
       <button onclick="hideCreateStatus()" style="padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
     </div>
   `;
@@ -663,11 +675,7 @@ function showReplaceAllConfirm(count, name) {
   el.style.display = "block";
 }
 
-async function confirmReplaceAll(suppress) {
-  if (suppress) {
-    suppressReplaceAllConfirm = true;
-    localStorage.setItem(LS_SUPPRESS_KEY, "true");
-  }
+async function confirmReplace(replaceAll) {
   hideCreateStatus();
 
   const text = pendingCreateText;
@@ -686,11 +694,17 @@ async function confirmReplaceAll(suppress) {
       const results = context.document.body.search(text, { matchCase: true });
       results.load("items");
       await context.sync();
-      count = results.items.length;
-      results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+      if (results.items.length === 0) return;
+      if (replaceAll) {
+        count = results.items.length;
+        results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+      } else {
+        count = 1;
+        results.items[0].insertText(`{{${name}}}`, Word.InsertLocation.replace);
+      }
       await context.sync();
     });
-    onPlaceholderCreated(name, count);
+    if (count > 0) onPlaceholderCreated(name, count);
   } catch (err) {
     showCreateStatus("Error: " + err.message, "error");
   }
@@ -705,10 +719,18 @@ function onPlaceholderCreated(name, count) {
   lastSuggestedName = "";
   lastSelectedText = "";
   updateSelectionPreview("");
-  createdPlaceholders.push(name);
+
+  // Merge into existing entry if the same placeholder was created again (e.g. after Ctrl+Z)
+  const existing = createdPlaceholders.find((e) => e.name === name);
+  if (existing) {
+    existing.count += count;
+  } else {
+    createdPlaceholders.push({ name, count });
+  }
+
   renderCreatedList();
   showCreateStatus(
-    `✓ Created {{${name}}}${count > 1 ? ` — replaced all ${count} occurrences` : ""}.`,
+    `✓ Created {{${name}}}${count > 1 ? ` — replaced ${count} occurrences` : ""}.`,
     "success"
   );
 }
@@ -727,7 +749,7 @@ function renderCreatedList() {
   section.style.display = "block";
   doneBtn.style.display = "block";
   list.innerHTML = createdPlaceholders
-    .map((n) => `<span class="created-chip">{{${escapeHtml(n)}}}</span>`)
+    .map((e) => `<span class="created-chip">{{${escapeHtml(e.name)}}}${e.count > 1 ? `<span class="chip-count">×${e.count}</span>` : ""}</span>`)
     .join("");
 }
 
