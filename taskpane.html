@@ -22,47 +22,93 @@
         </svg>
         <span class="header-title">DocFill</span>
       </div>
-      <p class="header-sub">Detect and fill template fields</p>
+      <p class="header-sub">Create and fill document templates</p>
     </header>
+
+    <div id="tab-bar">
+      <button class="tab-btn" id="tab-btn-create" onclick="switchTab('create')">Create</button>
+      <button class="tab-btn active" id="tab-btn-fill" onclick="switchTab('fill')">Fill</button>
+    </div>
 
     <main>
 
-      <!-- Empty state -->
-      <div id="empty-state">
-        <div class="empty-illustration">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <rect x="8" y="4" width="26" height="34" rx="3" fill="#e8edf5"/>
-            <rect x="8" y="4" width="26" height="34" rx="3" stroke="#c5cfe0" stroke-width="1.2"/>
-            <rect x="14" y="12" width="14" height="2" rx="1" fill="#a0aec0"/>
-            <rect x="14" y="17" width="10" height="2" rx="1" fill="#a0aec0"/>
-            <rect x="14" y="22" width="12" height="2" rx="1" fill="#a0aec0"/>
-            <circle cx="36" cy="33" r="8" fill="#2563eb"/>
-            <path d="M33 33h6M36 30v6" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
+      <!-- Create panel -->
+      <div id="panel-create" style="display:none">
+        <div id="selection-preview" class="selection-preview">
+          <span class="selection-hint-text">Select text in your document to get started</span>
         </div>
-        <h2 class="empty-title">Ready to fill</h2>
-        <p class="empty-desc">Add <code>{{placeholders}}</code> to your document, then scan to detect fields.</p>
-        <button class="btn btn-primary" id="scan-btn-empty" onclick="scanDocument()">
-          Scan Document
+
+        <div class="create-form-group">
+          <label class="create-label" for="placeholder-name-input">Placeholder name</label>
+          <input
+            id="placeholder-name-input"
+            class="field-value-input"
+            type="text"
+            placeholder="e.g. client_name"
+            spellcheck="false"
+            autocorrect="off"
+            autocapitalize="off"
+          />
+          <p class="create-field-hint">Letters, numbers, and underscores only</p>
+        </div>
+
+        <button class="btn btn-primary" id="create-replace-btn" onclick="createPlaceholder()">
+          Replace with Placeholder
+        </button>
+
+        <div id="create-status"></div>
+
+        <div id="created-list-section" style="display:none">
+          <div class="created-list-header">Created so far</div>
+          <div id="created-list"></div>
+        </div>
+
+        <button class="btn btn-done" id="done-fill-btn" style="display:none" onclick="switchToFill()">
+          Done — Fill This Template
         </button>
       </div>
 
-      <!-- Fields -->
-      <div id="fields-section">
-        <div class="section-bar">
-          <span class="field-count" id="field-count"></span>
-          <button class="btn-ghost" onclick="scanDocument()">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M10.5 6A4.5 4.5 0 1 1 6 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-              <path d="M6 1.5L8 3.5M6 1.5L8-.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Fill panel -->
+      <div id="panel-fill">
+
+        <!-- Empty state -->
+        <div id="empty-state">
+          <div class="empty-illustration">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect x="8" y="4" width="26" height="34" rx="3" fill="#e8edf5"/>
+              <rect x="8" y="4" width="26" height="34" rx="3" stroke="#c5cfe0" stroke-width="1.2"/>
+              <rect x="14" y="12" width="14" height="2" rx="1" fill="#a0aec0"/>
+              <rect x="14" y="17" width="10" height="2" rx="1" fill="#a0aec0"/>
+              <rect x="14" y="22" width="12" height="2" rx="1" fill="#a0aec0"/>
+              <circle cx="36" cy="33" r="8" fill="#2563eb"/>
+              <path d="M33 33h6M36 30v6" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
             </svg>
-            Rescan
+          </div>
+          <h2 class="empty-title">Ready to fill</h2>
+          <p class="empty-desc">Add <code>{{placeholders}}</code> to your document, then scan to detect fields.</p>
+          <button class="btn btn-primary" id="scan-btn-empty" onclick="scanDocument()">
+            Scan Document
           </button>
         </div>
 
-        <div id="fields-list"></div>
+        <!-- Fields -->
+        <div id="fields-section">
+          <div class="section-bar">
+            <span class="field-count" id="field-count"></span>
+            <button class="btn-ghost" onclick="scanDocument()">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M10.5 6A4.5 4.5 0 1 1 6 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M6 1.5L8 3.5M6 1.5L8-.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Rescan
+            </button>
+          </div>
 
-        <div id="status"></div>
+          <div id="fields-list"></div>
+
+          <div id="status"></div>
+        </div>
+
       </div>
 
     </main>

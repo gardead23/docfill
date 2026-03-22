@@ -12,11 +12,27 @@ let hasFilled = false;
 /** @type {Record<string, string>} */
 let lastFilledValues = {};
 
+// ── Create Mode State ──────────────────────────────────────────────────────────
+
+let activeTab = "fill";
+let lastSelectedText = "";
+let lastSuggestedName = "";
+/** @type {string[]} */
+let createdPlaceholders = [];
+let pendingCreateText = "";
+let pendingCreateName = "";
+let suppressReplaceAllConfirm = localStorage.getItem("template-filler:suppressReplaceAllConfirm") === "true";
+let selectionDebounceTimer = null;
+let selectionFetchInProgress = false;
+
 // ── Office Initialization ──────────────────────────────────────────────────────
 
 Office.onReady(function (info) {
   if (info.host === Office.HostType.Word) {
-    // Ready — wait for user to click Scan
+    Office.context.document.addHandlerAsync(
+      Office.EventType.DocumentSelectionChanged,
+      onSelectionChanged
+    );
   }
 });
 
@@ -431,6 +447,7 @@ function doFormClear() {
 // ── localStorage ───────────────────────────────────────────────────────────────
 
 const LS_PREFIX = "template-filler:";
+const LS_SUPPRESS_KEY = LS_PREFIX + "suppressReplaceAllConfirm";
 
 function buildStorageKey(keys) {
   return LS_PREFIX + [...keys].sort().join(",");
@@ -484,4 +501,251 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return String(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ── Tab Switching ──────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  if (tab === activeTab) return;
+  activeTab = tab;
+
+  document.getElementById("tab-btn-create").classList.toggle("active", tab === "create");
+  document.getElementById("tab-btn-fill").classList.toggle("active", tab === "fill");
+
+  document.getElementById("panel-create").style.display = tab === "create" ? "flex" : "none";
+  document.getElementById("panel-fill").style.display = tab === "fill" ? "block" : "none";
+
+  if (tab === "create") {
+    document.getElementById("actions").style.display = "none";
+  } else if (tab === "fill" && currentFields.length > 0) {
+    document.getElementById("actions").style.display = "flex";
+  }
+}
+
+// ── Selection Monitoring ───────────────────────────────────────────────────────
+
+function onSelectionChanged() {
+  if (activeTab !== "create") return;
+  clearTimeout(selectionDebounceTimer);
+  selectionDebounceTimer = setTimeout(fetchCurrentSelection, 250);
+}
+
+async function fetchCurrentSelection() {
+  if (activeTab !== "create" || selectionFetchInProgress) return;
+  selectionFetchInProgress = true;
+  try {
+    await Word.run(async (context) => {
+      const sel = context.document.getSelection();
+      sel.load("text");
+      await context.sync();
+      const text = sel.text.trim();
+      // Ignore multi-paragraph selections (Word returns \r between paragraphs)
+      lastSelectedText = text.includes("\r") || text.includes("\n") ? "" : text;
+      updateSelectionPreview(lastSelectedText);
+    });
+  } catch {
+    // ignore — selection may change during async fetch
+  } finally {
+    selectionFetchInProgress = false;
+  }
+}
+
+function updateSelectionPreview(text) {
+  const preview = document.getElementById("selection-preview");
+  const nameInput = document.getElementById("placeholder-name-input");
+  if (!preview || !nameInput) return;
+
+  if (!text) {
+    preview.className = "selection-preview";
+    preview.innerHTML = '<span class="selection-hint-text">Select text in your document to get started</span>';
+    return;
+  }
+
+  const display = text.length > 60 ? text.substring(0, 60) + "…" : text;
+  preview.className = "selection-preview has-selection";
+  preview.innerHTML = `<span class="selection-label">Selected</span><span class="selection-text">"${escapeHtml(display)}"</span>`;
+
+  const suggested = suggestPlaceholderName(text);
+  if (!nameInput.value || nameInput.value === lastSuggestedName) {
+    nameInput.value = suggested;
+    lastSuggestedName = suggested;
+  }
+}
+
+function suggestPlaceholderName(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+$/, "")
+    .substring(0, 40);
+}
+
+// ── Create Placeholder ─────────────────────────────────────────────────────────
+
+async function createPlaceholder() {
+  const text = lastSelectedText;
+  const nameInput = document.getElementById("placeholder-name-input");
+  const name = nameInput.value.trim();
+
+  if (!text) {
+    showCreateStatus("Select some text in the document first.", "error");
+    return;
+  }
+  if (!name) {
+    showCreateStatus("Enter a placeholder name.", "error");
+    nameInput.focus();
+    return;
+  }
+  if (!/^\w+$/.test(name)) {
+    showCreateStatus("Use only letters, numbers, and underscores.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("create-replace-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Replacing...';
+  hideCreateStatus();
+
+  let shouldProceed = true;
+  let occurrenceCount = 0;
+
+  try {
+    await Word.run(async (context) => {
+      const results = context.document.body.search(text, { matchCase: true });
+      results.load("items");
+      await context.sync();
+
+      occurrenceCount = results.items.length;
+
+      if (occurrenceCount === 0) {
+        shouldProceed = false;
+        return;
+      }
+
+      if (occurrenceCount > 1 && !suppressReplaceAllConfirm) {
+        shouldProceed = false;
+        pendingCreateText = text;
+        pendingCreateName = name;
+        showReplaceAllConfirm(occurrenceCount, name);
+        return;
+      }
+
+      results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+      await context.sync();
+    });
+
+    if (!shouldProceed && occurrenceCount === 0) {
+      showCreateStatus("Could not find that text in the document — try selecting it again.", "error");
+    } else if (shouldProceed) {
+      onPlaceholderCreated(name, occurrenceCount);
+    }
+  } catch (err) {
+    showCreateStatus("Error: " + err.message, "error");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "Replace with Placeholder";
+}
+
+function showReplaceAllConfirm(count, name) {
+  const el = document.getElementById("create-status");
+  el.innerHTML = `
+    <div style="margin-bottom:8px">Found <strong>${count} occurrences</strong> of this text. Replace all with <code>{{${escapeHtml(name)}}}</code>?</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onclick="confirmReplaceAll(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">Replace all</button>
+      <button onclick="confirmReplaceAll(true)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;min-width:80px;opacity:0.75">Replace, don't ask again</button>
+      <button onclick="hideCreateStatus()" style="padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
+    </div>
+  `;
+  el.className = "info";
+  el.style.display = "block";
+}
+
+async function confirmReplaceAll(suppress) {
+  if (suppress) {
+    suppressReplaceAllConfirm = true;
+    localStorage.setItem(LS_SUPPRESS_KEY, "true");
+  }
+  hideCreateStatus();
+
+  const text = pendingCreateText;
+  const name = pendingCreateName;
+  pendingCreateText = "";
+  pendingCreateName = "";
+  if (!text || !name) return;
+
+  const btn = document.getElementById("create-replace-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Replacing...';
+
+  try {
+    let count = 0;
+    await Word.run(async (context) => {
+      const results = context.document.body.search(text, { matchCase: true });
+      results.load("items");
+      await context.sync();
+      count = results.items.length;
+      results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+      await context.sync();
+    });
+    onPlaceholderCreated(name, count);
+  } catch (err) {
+    showCreateStatus("Error: " + err.message, "error");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "Replace with Placeholder";
+}
+
+function onPlaceholderCreated(name, count) {
+  const nameInput = document.getElementById("placeholder-name-input");
+  nameInput.value = "";
+  lastSuggestedName = "";
+  lastSelectedText = "";
+  updateSelectionPreview("");
+  createdPlaceholders.push(name);
+  renderCreatedList();
+  showCreateStatus(
+    `✓ Created {{${name}}}${count > 1 ? ` — replaced all ${count} occurrences` : ""}.`,
+    "success"
+  );
+}
+
+function renderCreatedList() {
+  const section = document.getElementById("created-list-section");
+  const list = document.getElementById("created-list");
+  const doneBtn = document.getElementById("done-fill-btn");
+
+  if (createdPlaceholders.length === 0) {
+    section.style.display = "none";
+    doneBtn.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+  doneBtn.style.display = "block";
+  list.innerHTML = createdPlaceholders
+    .map((n) => `<span class="created-chip">{{${escapeHtml(n)}}}</span>`)
+    .join("");
+}
+
+function switchToFill() {
+  switchTab("fill");
+  scanDocument();
+}
+
+// ── Create Status ──────────────────────────────────────────────────────────────
+
+function showCreateStatus(msg, type) {
+  const el = document.getElementById("create-status");
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = "block";
+}
+
+function hideCreateStatus() {
+  const el = document.getElementById("create-status");
+  if (el) el.style.display = "none";
 }
