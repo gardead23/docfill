@@ -14,7 +14,7 @@ A Microsoft Word task pane add-in for creating and filling document templates. B
 1. Add `{{placeholder_name}}` markers anywhere in your Word document
 2. Open the DocFill task pane (Home ribbon → **DocFill** button)
 3. Go to the **Fill** tab and click **Scan Document** — the add-in detects all placeholders
-4. Customize labels and field types (Text, Date, Number, Long text) if needed
+4. Customize labels and field types (Text, Date, Long text) if needed
 5. Fill in the values
 6. Click **Fill Document** — all placeholders are replaced instantly
 
@@ -35,10 +35,10 @@ Labels and field types are remembered the next time you open the same template.
 Use `{{snake_case_name}}` syntax. Only letters, numbers, and underscores.
 
 ```
-{{client_name}}       → auto-labeled "Client Name"
-{{start_date}}        → auto-labeled "Start Date"
-{{total_fee}}         → auto-labeled "Total Fee"
-{{project_scope}}     → auto-labeled "Project Scope"
+{{client_name}}       → auto-labeled "Client Name" (Text)
+{{start_date}}        → auto-labeled "Start Date" (Date)
+{{total_fee}}         → auto-labeled "Total Fee" (Text)
+{{project_scope}}     → auto-labeled "Project Scope" (Long text)
 ```
 
 ---
@@ -86,9 +86,20 @@ For Microsoft 365 organizations, an admin can deploy centrally:
 | Type | Input | Inserted as |
 |---|---|---|
 | Text | Single-line input | Value as-is |
-| Date | Date picker | "March 20, 2026" |
-| Number | Number input | Value as-is |
+| Date | Date picker + format selector | Formatted date (see below) |
 | Long text | Multi-line textarea | Value as-is |
+
+### Date Formats
+
+Date fields support multiple output formats. Set a **global default** that applies to all date fields, or override the format on individual fields.
+
+| Format | Example |
+|---|---|
+| Long (default) | March 22, 2026 |
+| Abbreviated | Mar 22, 2026 |
+| US short | 03/22/2026 |
+| International | 22/03/2026 |
+| ISO | 2026-03-22 |
 
 ---
 

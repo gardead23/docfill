@@ -95,14 +95,18 @@
         <div id="fields-section">
           <div class="section-bar">
             <span class="field-count" id="field-count"></span>
-            <button class="btn-ghost" onclick="scanDocument()">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M10.5 6A4.5 4.5 0 1 1 6 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <path d="M6 1.5L8 3.5M6 1.5L8-.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Rescan
-            </button>
+            <div class="section-bar-actions">
+              <button class="btn-ghost" onclick="scanDocument()">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M10.5 6A4.5 4.5 0 1 1 6 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M6 1.5L8 3.5M6 1.5L8-.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Rescan
+              </button>
+            </div>
           </div>
+
+          <div id="global-date-format" style="display:none"></div>
 
           <div id="fields-list"></div>
 

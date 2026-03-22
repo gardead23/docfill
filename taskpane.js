@@ -4,13 +4,43 @@
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-/** @type {{ key: string, label: string, type: string }[]} */
+/** @type {{ key: string, label: string, type: string, dateFormat?: string }[]} */
 let currentFields = [];
 let currentStorageKey = "";
 let originalOoxml = null;
 let hasFilled = false;
 /** @type {Record<string, string>} */
 let lastFilledValues = {};
+
+// ── Date Formats ─────────────────────────────────────────────────────────────
+
+const DATE_FORMATS = [
+  { value: "long",      label: "March 22, 2026" },
+  { value: "abbr",      label: "Mar 22, 2026" },
+  { value: "short-us",  label: "03/22/2026" },
+  { value: "short-intl", label: "22/03/2026" },
+  { value: "iso",       label: "2026-03-22" },
+];
+
+const DATE_FORMAT_LS_KEY = "docfill:dateFormat";
+
+function getGlobalDateFormat() {
+  try { return localStorage.getItem(DATE_FORMAT_LS_KEY) || "long"; }
+  catch { return "long"; }
+}
+
+function setGlobalDateFormat(format) {
+  try { localStorage.setItem(DATE_FORMAT_LS_KEY, format); } catch { /* ignore */ }
+  // Update all per-field dropdowns to reflect new default label
+  document.querySelectorAll(".date-format-select").forEach((sel) => {
+    const defaultOpt = sel.querySelector('option[value=""]');
+    if (defaultOpt) defaultOpt.textContent = `Default (${formatDatePreview(format)})`;
+  });
+}
+
+function formatDatePreview(format) {
+  return DATE_FORMATS.find((f) => f.value === format)?.label || "March 22, 2026";
+}
 
 // ── Create Mode State ──────────────────────────────────────────────────────────
 
@@ -87,11 +117,15 @@ async function scanDocument() {
       currentStorageKey = buildStorageKey(keys);
       const saved = loadFieldConfigs(currentStorageKey);
 
-      currentFields = keys.map((key) => ({
-        key,
-        label: saved[key]?.label || toTitleCase(key),
-        type: saved[key]?.type || guessFieldType(key),
-      }));
+      currentFields = keys.map((key) => {
+        const savedType = saved[key]?.type === "number" ? "text" : saved[key]?.type; // migrate old "number"
+        return {
+          key,
+          label: saved[key]?.label || toTitleCase(key),
+          type: savedType || guessFieldType(key),
+          dateFormat: saved[key]?.dateFormat,
+        };
+      });
 
       saveFieldConfigs(currentStorageKey, currentFields);
       renderForm(currentFields);
@@ -123,6 +157,9 @@ function renderForm(fields) {
     row.className = "field-row";
     row.dataset.key = field.key;
 
+    const fieldType = field.type === "number" ? "text" : field.type; // migrate old "number" type
+    if (field.type === "number") field.type = "text";
+
     row.innerHTML = `
       <div class="field-top">
         <input
@@ -144,24 +181,14 @@ function renderForm(fields) {
             <path d="M2 3v2.5h2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
-        <button
-          class="field-edit-btn"
-          title="Change field type"
-          onclick="toggleTypePanel('${escapeAttr(field.key)}')"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M8.5 1.5a1.414 1.414 0 0 1 2 2L3.5 10.5 1 11l.5-2.5 7-7z"
-              stroke="currentColor" stroke-width="1.2"
-              stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
       </div>
-      <div class="field-type-panel" id="type-panel-${escapeAttr(field.key)}">
-        ${["text", "date", "number", "paragraph"].map((t) => `
+      <div class="field-type-pills">
+        ${[["text", "Text"], ["date", "Date"], ["paragraph", "Long text"]].map(([t, label]) => `
           <button
-            class="type-pill ${field.type === t ? "active" : ""}"
+            class="type-pill ${fieldType === t ? "active" : ""}"
+            data-type="${t}"
             onclick="setFieldType('${escapeAttr(field.key)}', '${t}')"
-          >${t === "paragraph" ? "Long text" : t.charAt(0).toUpperCase() + t.slice(1)}</button>
+          >${label}</button>
         `).join("")}
       </div>
       ${buildValueInput(field)}
@@ -177,6 +204,31 @@ function renderForm(fields) {
       if (resetBtn) resetBtn.style.display = "inline-flex";
     }
   });
+
+  // Show global date format selector if any date fields exist
+  renderGlobalDateFormat(fields);
+}
+
+function renderGlobalDateFormat(fields) {
+  const container = document.getElementById("global-date-format");
+  if (!container) return;
+  const hasDateFields = fields.some((f) => f.type === "date");
+  if (!hasDateFields) {
+    container.style.display = "none";
+    return;
+  }
+  const current = getGlobalDateFormat();
+  container.style.display = "flex";
+  container.innerHTML = `
+    <label class="global-date-label" for="global-date-select">Default date format</label>
+    <select id="global-date-select" class="date-format-select" onchange="onGlobalDateFormatChange(this.value)">
+      ${DATE_FORMATS.map((f) => `<option value="${f.value}" ${f.value === current ? "selected" : ""}>${f.label}</option>`).join("")}
+    </select>
+  `;
+}
+
+function onGlobalDateFormatChange(format) {
+  setGlobalDateFormat(format);
 }
 
 /** Build the right input element based on field type. */
@@ -190,42 +242,48 @@ function buildValueInput(field) {
       rows="3"
     ></textarea>`;
   }
-  const inputType = field.type === "date" ? "date" : field.type === "number" ? "number" : "text";
+  if (field.type === "date") {
+    const globalFmt = getGlobalDateFormat();
+    const fieldFmt = field.dateFormat || "";
+    return `<input
+      id="${id}"
+      class="field-value-input"
+      type="date"
+    />
+    <select
+      class="date-format-select"
+      id="datefmt-${field.key}"
+      onchange="setFieldDateFormat('${escapeAttr(field.key)}', this.value)"
+      title="Date output format"
+    >
+      <option value="" ${!fieldFmt ? "selected" : ""}>Default (${formatDatePreview(globalFmt)})</option>
+      ${DATE_FORMATS.map((f) => `<option value="${f.value}" ${fieldFmt === f.value ? "selected" : ""}>${f.label}</option>`).join("")}
+    </select>`;
+  }
   return `<input
     id="${id}"
     class="field-value-input"
-    type="${inputType}"
-    placeholder="${inputType === "date" ? "" : "Enter " + escapeHtml(field.label).toLowerCase() + "..."}"
+    type="text"
+    placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..."
   />`;
 }
 
 // ── Field Edit Handlers ────────────────────────────────────────────────────────
 
-function toggleTypePanel(key) {
-  const panel = document.getElementById(`type-panel-${key}`);
-  if (!panel) return;
-  const isOpen = panel.classList.contains("open");
-  // Close all panels first
-  document.querySelectorAll(".field-type-panel.open").forEach((p) => p.classList.remove("open"));
-  if (!isOpen) panel.classList.add("open");
-}
-
 function setFieldType(key, newType) {
   const field = currentFields.find((f) => f.key === key);
-  if (!field || field.type === newType) {
-    toggleTypePanel(key); // close panel if same type selected
-    return;
-  }
+  if (!field || field.type === newType) return;
 
   const oldValue = document.getElementById(`val-${key}`)?.value || "";
   field.type = newType;
+  if (newType !== "date") delete field.dateFormat;
   saveFieldConfigs(currentStorageKey, currentFields);
 
   // Rebuild the value input
   const row = document.querySelector(`.field-row[data-key="${key}"]`);
   if (!row) return;
-  const oldInput = row.querySelector(".field-value-input, .field-value-textarea");
-  if (oldInput) oldInput.remove();
+  // Remove old input + date format select if present
+  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-format-select").forEach((el) => el.remove());
   row.insertAdjacentHTML("beforeend", buildValueInput(field));
   if (newType !== "date") {
     const newInput = row.querySelector(".field-value-input, .field-value-textarea");
@@ -234,13 +292,15 @@ function setFieldType(key, newType) {
 
   // Update pill active states
   row.querySelectorAll(".type-pill").forEach((pill) => {
-    pill.classList.toggle("active", pill.textContent.trim().toLowerCase().replace(" ", "") ===
-      (newType === "paragraph" ? "longtext" : newType));
+    pill.classList.toggle("active", pill.dataset.type === newType);
   });
+}
 
-  // Close the panel
-  const panel = document.getElementById(`type-panel-${key}`);
-  if (panel) panel.classList.remove("open");
+function setFieldDateFormat(key, format) {
+  const field = currentFields.find((f) => f.key === key);
+  if (!field) return;
+  field.dateFormat = format || undefined;
+  saveFieldConfigs(currentStorageKey, currentFields);
 }
 
 function onLabelChange(key, newLabel) {
@@ -253,7 +313,6 @@ function onLabelChange(key, newLabel) {
 function guessFieldType(key) {
   const k = key.toLowerCase();
   if (/date|day|month|year|when|start|end|deadline|due|expir|signed|effective/.test(k)) return "date";
-  if (/amount|fee|price|cost|total|number|qty|quantity|count|rate|salary|budget|hours|days/.test(k)) return "number";
   if (/description|notes?|bio|summary|detail|scope|address|comments?|message|body|terms/.test(k)) return "paragraph";
   return "text";
 }
@@ -377,21 +436,37 @@ async function fillDocument() {
 
 function collectValues() {
   const values = {};
+  const globalFmt = getGlobalDateFormat();
   currentFields.forEach((field) => {
     const el = document.getElementById(`val-${field.key}`);
     let value = el ? el.value.trim() : "";
-    if (field.type === "date" && value) value = formatDate(value);
+    if (field.type === "date" && value) {
+      const fmt = field.dateFormat || globalFmt;
+      value = formatDate(value, fmt);
+    }
     values[field.key] = value;
   });
   return values;
 }
 
-function formatDate(isoDate) {
+function formatDate(isoDate, format) {
   try {
     const [year, month, day] = isoDate.split("-").map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-      year: "numeric", month: "long", day: "numeric",
-    });
+    const d = new Date(year, month - 1, day);
+    const pad = (n) => String(n).padStart(2, "0");
+    switch (format) {
+      case "abbr":
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+      case "short-us":
+        return `${pad(month)}/${pad(day)}/${year}`;
+      case "short-intl":
+        return `${pad(day)}/${pad(month)}/${year}`;
+      case "iso":
+        return isoDate;
+      case "long":
+      default:
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    }
   } catch {
     return isoDate;
   }
@@ -502,7 +577,11 @@ function loadFieldConfigs(storageKey) {
 
 function saveFieldConfigs(storageKey, fields) {
   const data = {};
-  fields.forEach((f) => { data[f.key] = { label: f.label, type: f.type }; });
+  fields.forEach((f) => {
+    const entry = { label: f.label, type: f.type };
+    if (f.dateFormat) entry.dateFormat = f.dateFormat;
+    data[f.key] = entry;
+  });
   try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch { /* ignore */ }
 }
 

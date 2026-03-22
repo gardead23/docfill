@@ -38,7 +38,7 @@ Two-tab layout. Default tab: **Fill** (preserves existing behaviour). **Create**
 
 ### State model — Fill mode
 Five top-level state variables:
-- `currentFields` — ordered array of `{ key, label, type }` from last scan
+- `currentFields` — ordered array of `{ key, label, type, dateFormat? }` from last scan
 - `currentStorageKey` — localStorage key for field config persistence
 - `originalOoxml` — OOXML snapshot of the document; used for full document restore on reset
 - `hasFilled` — whether any fills have been applied in this session
@@ -98,6 +98,18 @@ When `createPlaceholder()` finds more than one occurrence, it stores `pendingCre
 ### `confirm()` is blocked in Office add-in webviews
 `window.confirm()` silently returns `false` in the Office add-in webview on Mac (and likely Windows). **Never use native confirm/alert/prompt dialogs.** All confirmation UX must use inline HTML rendered into `#status` or `#create-status`.
 
+### Field types and date formatting
+Three field types: `text` (default), `date` (date picker + format selector), `paragraph` (textarea). Auto-detected from placeholder key name via `guessFieldType()`. Type pills are always visible on each field card (no toggle/expand needed).
+
+Date format system:
+- **Global default** stored in `localStorage` under `docfill:dateFormat` (default: `"long"`)
+- **Per-field override** stored as `dateFormat` property in the field config object (in `localStorage` under the `template-filler:` key)
+- `formatDate(isoDate, format)` handles 5 formats: `long`, `abbr`, `short-us`, `short-intl`, `iso`
+- `collectValues()` resolves: per-field override → global default → `"long"`
+- Global selector shown above the fields list when any date fields exist; per-field dropdown shown below each date picker
+
+Legacy migration: old `type: "number"` values are silently converted to `"text"` on load.
+
 ### Field order preservation on rescan
 After a fill, rescanning finds fewer placeholders (consumed ones are gone). To preserve order:
 1. Merge `docKeys` (found in doc) with `Object.keys(lastFilledValues)` (already filled)
@@ -107,7 +119,7 @@ After a fill, rescanning finds fewer placeholders (consumed ones are gone). To p
 When `scanDocument()` runs, for any key that appears as `{{placeholder}}` in the document, that key is deleted from `lastFilledValues`. This handles cases where the user undid a fill via Ctrl+Z, keeping DocFill's state consistent with the document.
 
 ### localStorage persistence
-Field labels and types are saved keyed by the sorted+joined set of placeholder keys. Same template shape → same configs on next open. Prefix: `template-filler:` (kept as-is to avoid breaking existing data).
+Field labels, types, and per-field date formats are saved keyed by the sorted+joined set of placeholder keys. Same template shape → same configs on next open. Prefix: `template-filler:` (kept as-is to avoid breaking existing data). Global date format stored separately under `docfill:dateFormat`.
 
 ## Icons
 
