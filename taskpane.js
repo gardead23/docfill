@@ -21,6 +21,8 @@ let lastSuggestedName = "";
 let createdPlaceholders = [];
 let pendingCreateText = "";
 let pendingCreateName = "";
+/** @type {Record<string, number>} tracks which occurrence to navigate to next per placeholder */
+const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
 
@@ -749,8 +751,38 @@ function renderCreatedList() {
   section.style.display = "block";
   doneBtn.style.display = "block";
   list.innerHTML = createdPlaceholders
-    .map((e) => `<span class="created-chip">{{${escapeHtml(e.name)}}}${e.count > 1 ? `<span class="chip-count">×${e.count}</span>` : ""}</span>`)
+    .map((e) => `<span class="created-chip" onclick="navigateToChip('${escapeAttr(e.name)}')" title="Click to highlight in document">{{${escapeHtml(e.name)}}}${e.count > 1 ? `<span class="chip-count">×${e.count}</span>` : ""}</span>`)
     .join("");
+}
+
+async function navigateToChip(name) {
+  const idx = chipNavIndex[name] || 0;
+  try {
+    await Word.run(async (context) => {
+      const results = context.document.body.search(`{{${name}}}`, { matchCase: true });
+      results.load("items");
+      await context.sync();
+
+      if (results.items.length === 0) {
+        showCreateStatus(`{{${name}}} not found — it may have been filled or removed.`, "error");
+        return;
+      }
+
+      const targetIdx = idx % results.items.length;
+      results.items[targetIdx].select();
+      await context.sync();
+
+      chipNavIndex[name] = (targetIdx + 1) % results.items.length;
+
+      if (results.items.length > 1) {
+        showCreateStatus(`{{${name}}} — occurrence ${targetIdx + 1} of ${results.items.length}`, "info");
+      } else {
+        hideCreateStatus();
+      }
+    });
+  } catch (err) {
+    showCreateStatus("Error: " + err.message, "error");
+  }
 }
 
 function switchToFill() {

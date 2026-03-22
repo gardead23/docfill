@@ -550,6 +550,14 @@ footer#actions {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+
+.created-chip:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
 
 .chip-count {
