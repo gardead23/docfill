@@ -2,7 +2,7 @@
 
 A Microsoft Word task pane add-in for creating and filling document templates. Build templates from existing docs, then fill them — all inside Word with no server required.
 
-**Live add-in:** https://docfill.pages.dev
+**Live add-in:** https://docfill.smplhq.com
 **GitHub:** https://github.com/gardead23/docfill
 
 ---
@@ -112,7 +112,7 @@ docfill/
 
 ## Development & Deployment
 
-The add-in is hosted on Cloudflare Pages, connected to the `gardead23/docfill` GitHub repo. Deployments are automatic — every push to `main` deploys to https://docfill.pages.dev.
+The add-in is hosted on Cloudflare Pages, connected to the `gardead23/docfill` GitHub repo. Deployments are automatic — every push to `main` deploys to https://docfill.smplhq.com.
 
 For local testing, serve the files over localhost:
 ```bash

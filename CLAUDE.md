@@ -2,7 +2,7 @@
 
 Microsoft Word task pane add-in. Pure static files, no build step. Hosted on Cloudflare Pages.
 
-**Live URL:** https://docfill.pages.dev
+**Live URL:** https://docfill.smplhq.com
 **Hosting:** Cloudflare Pages — auto-deploys on push to `main` (repo: `gardead23/docfill`)
 
 ## Architecture
@@ -111,7 +111,7 @@ Field labels and types are saved keyed by the sorted+joined set of placeholder k
 
 ## Deployment
 
-Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys automatically to https://docfill.pages.dev — no manual deploy step needed.
+Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys automatically to https://docfill.smplhq.com — no manual deploy step needed.
 
 ## Office.js Gotchas
 
