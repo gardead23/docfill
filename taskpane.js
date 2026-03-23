@@ -207,49 +207,10 @@ function renderForm(fields) {
     }
   });
 
-  // Initialize flatpickr on all date inputs
-  initFlatpickrAll();
-
   // Show global date format selector if any date fields exist
   renderGlobalDateFormat(fields);
 }
 
-/** Initialize flatpickr on all date inputs that haven't been initialized yet. */
-function initFlatpickrAll() {
-  document.querySelectorAll(".flatpickr-date").forEach((el) => {
-    if (el._flatpickr) return; // already initialized
-    flatpickr(el, {
-      dateFormat: "Y-m-d",
-      altInput: true,
-      altFormat: "F j, Y",
-      disableMobile: true,
-      allowInput: false,
-      clickOpens: true,
-      altInputClass: "flatpickr-alt field-value-input",
-    });
-  });
-}
-
-/** Initialize flatpickr on a single element by field key. */
-function initFlatpickrForField(key) {
-  const el = document.getElementById(`val-${key}`);
-  if (!el || el._flatpickr) return;
-  flatpickr(el, {
-    dateFormat: "Y-m-d",
-    altInput: true,
-    altFormat: "F j, Y",
-    disableMobile: true,
-    allowInput: false,
-    clickOpens: true,
-    altInputClass: "flatpickr-alt field-value-input",
-  });
-}
-
-/** Destroy flatpickr instance on a field if it exists. */
-function destroyFlatpickr(key) {
-  const el = document.getElementById(`val-${key}`);
-  if (el && el._flatpickr) el._flatpickr.destroy();
-}
 
 function renderGlobalDateFormat(fields) {
   const container = document.getElementById("global-date-format");
@@ -287,12 +248,19 @@ function buildValueInput(field) {
   if (field.type === "date") {
     const globalFmt = getGlobalDateFormat();
     const fieldFmt = field.dateFormat || "";
-    return `<input
-      id="${id}"
-      class="field-value-input flatpickr-date"
-      type="text"
-      placeholder="Select date..."
-    />
+    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const monthOpts = months.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("");
+    const dayOpts = Array.from({length: 31}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
+    const curYear = new Date().getFullYear();
+    const yearOpts = Array.from({length: 21}, (_, i) => {
+      const y = curYear - 5 + i;
+      return `<option value="${y}"${y === curYear ? " selected" : ""}>${y}</option>`;
+    }).join("");
+    return `<div class="date-dropdowns" id="${id}">
+      <select class="date-select date-month" title="Month"><option value="">Month</option>${monthOpts}</select>
+      <select class="date-select date-day" title="Day"><option value="">Day</option>${dayOpts}</select>
+      <select class="date-select date-year" title="Year"><option value="">Year</option>${yearOpts}</select>
+    </div>
     <select
       class="date-format-select"
       id="datefmt-${field.key}"
@@ -318,8 +286,6 @@ function setFieldType(key, newType) {
   if (!field || field.type === newType) return;
 
   const oldValue = document.getElementById(`val-${key}`)?.value || "";
-  // Destroy flatpickr before removing DOM elements
-  destroyFlatpickr(key);
   field.type = newType;
   if (newType !== "date") delete field.dateFormat;
   saveFieldConfigs(currentStorageKey, currentFields);
@@ -327,12 +293,10 @@ function setFieldType(key, newType) {
   // Rebuild the value input
   const row = document.querySelector(`.field-row[data-key="${key}"]`);
   if (!row) return;
-  // Remove old input + date format select + any flatpickr alt input
-  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-format-select, .flatpickr-date").forEach((el) => el.remove());
+  // Remove old input + date dropdowns + date format select
+  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-dropdowns, .date-format-select").forEach((el) => el.remove());
   row.insertAdjacentHTML("beforeend", buildValueInput(field));
-  if (newType === "date") {
-    initFlatpickrForField(key);
-  } else {
+  if (newType !== "date") {
     const newInput = row.querySelector(".field-value-input, .field-value-textarea");
     if (newInput) newInput.value = oldValue;
   }
@@ -485,13 +449,27 @@ function collectValues() {
   const values = {};
   const globalFmt = getGlobalDateFormat();
   currentFields.forEach((field) => {
-    const el = document.getElementById(`val-${field.key}`);
-    let value = el ? el.value.trim() : "";
-    if (field.type === "date" && value) {
-      const fmt = field.dateFormat || globalFmt;
-      value = formatDate(value, fmt);
+    if (field.type === "date") {
+      const container = document.getElementById(`val-${field.key}`);
+      if (container) {
+        const m = container.querySelector(".date-month")?.value;
+        const d = container.querySelector(".date-day")?.value;
+        const y = container.querySelector(".date-year")?.value;
+        if (m && d && y) {
+          const pad = (n) => String(n).padStart(2, "0");
+          const isoDate = `${y}-${pad(m)}-${pad(d)}`;
+          const fmt = field.dateFormat || globalFmt;
+          values[field.key] = formatDate(isoDate, fmt);
+        } else {
+          values[field.key] = "";
+        }
+      } else {
+        values[field.key] = "";
+      }
+    } else {
+      const el = document.getElementById(`val-${field.key}`);
+      values[field.key] = el ? el.value.trim() : "";
     }
-    values[field.key] = value;
   });
   return values;
 }
