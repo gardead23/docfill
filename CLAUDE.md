@@ -99,16 +99,16 @@ When `createPlaceholder()` finds more than one occurrence, it stores `pendingCre
 `window.confirm()` silently returns `false` in the Office add-in webview on Mac (and likely Windows). **Never use native confirm/alert/prompt dialogs.** All confirmation UX must use inline HTML rendered into `#status` or `#create-status`.
 
 ### Field types and date formatting
-Three field types: `text` (default), `date` (flatpickr date picker + format selector), `paragraph` (textarea). Auto-detected from placeholder key name via `guessFieldType()`. Type pills are always visible on each field card (no toggle/expand needed).
+Three field types: `text` (default), `date` (month/day/year dropdowns + format selector), `paragraph` (textarea). Auto-detected from placeholder key name via `guessFieldType()`. Type pills are always visible on each field card (no toggle/expand needed).
 
-Date picker uses [flatpickr](https://flatpickr.js.org/) loaded from jsDelivr CDN. Key config: `dateFormat: "Y-m-d"` (ISO value), `altInput: true` with `altFormat: "F j, Y"` (display), `altInputClass: "flatpickr-alt field-value-input"`. Calendar appends to `document.body` (default) — do NOT use `appendTo` with a parent element, as the Office webview clips the calendar popup. Flatpickr instances are initialized via `initFlatpickrAll()` after `renderForm()` and `initFlatpickrForField()` after type changes. Instances are destroyed via `destroyFlatpickr()` before DOM removal to prevent memory leaks.
+Date input uses three `<select>` dropdowns (Month, Day, Year) inside a `.date-dropdowns` container. The container div gets `id="val-${field.key}"` so `collectValues()` can read the selected values. Year range is current year ± 5 years (21 options), defaulting to the current year.
 
 Date format system:
 - **Global default** stored in `localStorage` under `docfill:dateFormat` (default: `"long"`)
 - **Per-field override** stored as `dateFormat` property in the field config object (in `localStorage` under the `template-filler:` key)
 - `formatDate(isoDate, format)` handles 5 formats: `long`, `abbr`, `short-us`, `short-intl`, `iso`
 - `collectValues()` resolves: per-field override → global default → `"long"`
-- Global selector shown above the fields list when any date fields exist; per-field dropdown shown below each date picker
+- Global selector shown above the fields list when any date fields exist; per-field dropdown shown below each date field
 
 Legacy migration: old `type: "number"` values are silently converted to `"text"` on load.
 
