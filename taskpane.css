@@ -310,9 +310,8 @@ span.flatpickr-weekday {
   height: 10px;
 }
 
-/* Alt input styling — flatpickr creates this as a visible input */
-.field-row input.flatpickr-date + input.form-control,
-.field-row input.flatpickr-date + input {
+/* Alt input styling — flatpickr creates this as the visible input (altInputClass) */
+.field-row input.flatpickr-alt {
   width: 100%;
   font-family: inherit;
   font-size: 13px;
@@ -325,16 +324,13 @@ span.flatpickr-weekday {
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
-.field-row input.flatpickr-date + input:focus {
+.field-row input.flatpickr-alt:focus {
   border-color: #2563eb;
   background: #ffffff;
   box-shadow: 0 0 0 3px #2563eb18;
 }
 
-/* Hide the original input since flatpickr uses altInput */
-input.flatpickr-date[readonly] {
-  display: none;
-}
+/* Flatpickr hides the original input automatically with altInput: true */
 
 /* ── Global date format ── */
 #global-date-format {

@@ -223,7 +223,9 @@ function initFlatpickrAll() {
       altInput: true,
       altFormat: "F j, Y",
       disableMobile: true,
-      appendTo: el.closest(".field-row") || undefined,
+      allowInput: false,
+      clickOpens: true,
+      altInputClass: "flatpickr-alt field-value-input",
     });
   });
 }
@@ -237,7 +239,9 @@ function initFlatpickrForField(key) {
     altInput: true,
     altFormat: "F j, Y",
     disableMobile: true,
-    appendTo: el.closest(".field-row") || undefined,
+    allowInput: false,
+    clickOpens: true,
+    altInputClass: "flatpickr-alt field-value-input",
   });
 }
 
@@ -288,7 +292,6 @@ function buildValueInput(field) {
       class="field-value-input flatpickr-date"
       type="text"
       placeholder="Select date..."
-      readonly
     />
     <select
       class="date-format-select"
