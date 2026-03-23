@@ -244,7 +244,16 @@ main {
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06);
   border: 1px solid #e5e7eb;
-  width: 260px;
+  width: 280px;
+}
+
+.flatpickr-innerContainer,
+.flatpickr-rContainer,
+.flatpickr-days,
+.dayContainer {
+  width: 100%;
+  max-width: 100%;
+  min-width: 100%;
 }
 
 .flatpickr-months {
@@ -262,7 +271,12 @@ main {
 }
 
 .flatpickr-current-month .numInputWrapper {
-  width: 5ch;
+  width: 5.5ch;
+}
+
+.flatpickr-current-month .numInputWrapper span.arrowUp,
+.flatpickr-current-month .numInputWrapper span.arrowDown {
+  right: -8px;
 }
 
 .flatpickr-current-month input.cur-year {
@@ -271,7 +285,7 @@ main {
 }
 
 .flatpickr-day {
-  max-width: 32px;
+  max-width: 34px;
   height: 32px;
   line-height: 32px;
   font-size: 12px;
