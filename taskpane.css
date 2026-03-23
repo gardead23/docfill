@@ -272,7 +272,7 @@ main {
 /* ── Date dropdowns ── */
 .date-dropdowns {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   width: 100%;
 }
