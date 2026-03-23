@@ -258,7 +258,7 @@ function buildValueInput(field) {
     }).join("");
     return `<div class="date-dropdowns" id="${id}">
       <select class="date-select date-month" title="Month"><option value="">Month</option>${monthOpts}</select>
-      <select class="date-select date-day" title="Day"><option value="">Day&nbsp;</option>${dayOpts}</select>
+      <select class="date-select date-day" title="Day"><option value="">Day</option>${dayOpts}</select>
       <select class="date-select date-year" title="Year"><option value="" selected>Year</option>${yearOpts}</select>
       <button type="button" class="date-today-btn" onclick="setDateToday('${escapeAttr(field.key)}')" title="Set to today">Today</button>
     </div>

@@ -301,7 +301,7 @@ main {
 }
 
 .date-day {
-  flex: 0.7;
+  flex: 0.85;
   min-width: 0;
 }
 
