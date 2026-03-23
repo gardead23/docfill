@@ -211,17 +211,49 @@ main {
 }
 
 /* ── Date format dropdown ── */
-.date-format-select {
-  width: 100%;
+.date-today-btn {
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.date-today-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.date-format-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.date-format-label {
+  font-size: 12px;
+  font-weight: 500;
   color: #6b7280;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.date-format-select {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  color: #6b7280;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 7px;
+  padding: 7px 8px;
   background: #f9fafb;
   outline: none;
-  margin-top: 6px;
   cursor: pointer;
   transition: border-color 0.15s;
 }

@@ -260,16 +260,20 @@ function buildValueInput(field) {
       <select class="date-select date-month" title="Month"><option value="">Month</option>${monthOpts}</select>
       <select class="date-select date-day" title="Day"><option value="">Day</option>${dayOpts}</select>
       <select class="date-select date-year" title="Year"><option value="">Year</option>${yearOpts}</select>
+      <button type="button" class="date-today-btn" onclick="setDateToday('${escapeAttr(field.key)}')" title="Set to today">Today</button>
     </div>
-    <select
-      class="date-format-select"
-      id="datefmt-${field.key}"
-      onchange="setFieldDateFormat('${escapeAttr(field.key)}', this.value)"
-      title="Date output format"
-    >
-      <option value="" ${!fieldFmt ? "selected" : ""}>Default (${formatDatePreview(globalFmt)})</option>
-      ${DATE_FORMATS.map((f) => `<option value="${f.value}" ${fieldFmt === f.value ? "selected" : ""}>${f.label}</option>`).join("")}
-    </select>`;
+    <div class="date-format-row">
+      <span class="date-format-label">Format:</span>
+      <select
+        class="date-format-select"
+        id="datefmt-${field.key}"
+        onchange="setFieldDateFormat('${escapeAttr(field.key)}', this.value)"
+        title="Date output format"
+      >
+        <option value="" ${!fieldFmt ? "selected" : ""}>Default (${formatDatePreview(globalFmt)})</option>
+        ${DATE_FORMATS.map((f) => `<option value="${f.value}" ${fieldFmt === f.value ? "selected" : ""}>${f.label}</option>`).join("")}
+      </select>
+    </div>`;
   }
   return `<input
     id="${id}"
@@ -293,8 +297,8 @@ function setFieldType(key, newType) {
   // Rebuild the value input
   const row = document.querySelector(`.field-row[data-key="${key}"]`);
   if (!row) return;
-  // Remove old input + date dropdowns + date format select
-  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-dropdowns, .date-format-select").forEach((el) => el.remove());
+  // Remove old input + date dropdowns + date format row
+  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-dropdowns, .date-format-row").forEach((el) => el.remove());
   row.insertAdjacentHTML("beforeend", buildValueInput(field));
   if (newType !== "date") {
     const newInput = row.querySelector(".field-value-input, .field-value-textarea");
@@ -305,6 +309,15 @@ function setFieldType(key, newType) {
   row.querySelectorAll(".type-pill").forEach((pill) => {
     pill.classList.toggle("active", pill.dataset.type === newType);
   });
+}
+
+function setDateToday(key) {
+  const container = document.getElementById(`val-${key}`);
+  if (!container) return;
+  const now = new Date();
+  container.querySelector(".date-month").value = now.getMonth() + 1;
+  container.querySelector(".date-day").value = now.getDate();
+  container.querySelector(".date-year").value = now.getFullYear();
 }
 
 function setFieldDateFormat(key, format) {

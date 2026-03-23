@@ -101,7 +101,7 @@ When `createPlaceholder()` finds more than one occurrence, it stores `pendingCre
 ### Field types and date formatting
 Three field types: `text` (default), `date` (month/day/year dropdowns + format selector), `paragraph` (textarea). Auto-detected from placeholder key name via `guessFieldType()`. Type pills are always visible on each field card (no toggle/expand needed).
 
-Date input uses three `<select>` dropdowns (Month, Day, Year) inside a `.date-dropdowns` container. The container div gets `id="val-${field.key}"` so `collectValues()` can read the selected values. Year range is current year ± 5 years (21 options), defaulting to the current year.
+Date input uses three `<select>` dropdowns (Month, Day, Year) plus a "Today" button inside a `.date-dropdowns` container. The container div gets `id="val-${field.key}"` so `collectValues()` can read the selected values. Year range is current year ± 5 years (21 options), defaulting to the current year. The "Today" button calls `setDateToday(key)` to populate all three dropdowns with the current date. Format selector is wrapped in a `.date-format-row` with a "Format:" label.
 
 Date format system:
 - **Global default** stored in `localStorage` under `docfill:dateFormat` (default: `"long"`)
