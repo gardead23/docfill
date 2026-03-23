@@ -272,6 +272,7 @@ main {
 /* ── Date dropdowns ── */
 .date-dropdowns {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   width: 100%;
 }
@@ -287,27 +288,7 @@ main {
   outline: none;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   cursor: pointer;
-}
-
-.date-select:focus {
-  border-color: #2563eb;
-  background: #ffffff;
-  box-shadow: 0 0 0 3px #2563eb18;
-}
-
-.date-month {
-  flex: 1.4;
-  min-width: 0;
-}
-
-.date-day {
-  flex: 0.85;
-  min-width: 0;
-}
-
-.date-year {
-  flex: 0.9;
-  min-width: 0;
+  width: auto;
 }
 
 /* ── Global date format ── */
