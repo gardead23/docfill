@@ -101,7 +101,7 @@ When `createPlaceholder()` finds more than one occurrence, it stores `pendingCre
 ### Field types and date formatting
 Three field types: `text` (default), `date` (flatpickr date picker + format selector), `paragraph` (textarea). Auto-detected from placeholder key name via `guessFieldType()`. Type pills are always visible on each field card (no toggle/expand needed).
 
-Date picker uses [flatpickr](https://flatpickr.js.org/) loaded from jsDelivr CDN. Key config: `dateFormat: "Y-m-d"` (ISO value), `altInput: true` with `altFormat: "F j, Y"` (display). Flatpickr instances are initialized via `initFlatpickrAll()` after `renderForm()` and `initFlatpickrForField()` after type changes. Instances are destroyed via `destroyFlatpickr()` before DOM removal to prevent memory leaks. `appendTo` is set to the parent `.field-row` so the calendar renders inside the task pane scroll area.
+Date picker uses [flatpickr](https://flatpickr.js.org/) loaded from jsDelivr CDN. Key config: `dateFormat: "Y-m-d"` (ISO value), `altInput: true` with `altFormat: "F j, Y"` (display), `altInputClass: "flatpickr-alt field-value-input"`. Calendar appends to `document.body` (default) — do NOT use `appendTo` with a parent element, as the Office webview clips the calendar popup. Flatpickr instances are initialized via `initFlatpickrAll()` after `renderForm()` and `initFlatpickrForField()` after type changes. Instances are destroyed via `destroyFlatpickr()` before DOM removal to prevent memory leaks.
 
 Date format system:
 - **Global default** stored in `localStorage` under `docfill:dateFormat` (default: `"long"`)
