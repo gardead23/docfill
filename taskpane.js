@@ -254,12 +254,12 @@ function buildValueInput(field) {
     const curYear = new Date().getFullYear();
     const yearOpts = Array.from({length: 21}, (_, i) => {
       const y = curYear - 5 + i;
-      return `<option value="${y}"${y === curYear ? " selected" : ""}>${y}</option>`;
+      return `<option value="${y}">${y}</option>`;
     }).join("");
     return `<div class="date-dropdowns" id="${id}">
       <select class="date-select date-month" title="Month"><option value="">Month</option>${monthOpts}</select>
-      <select class="date-select date-day" title="Day"><option value="">Day</option>${dayOpts}</select>
-      <select class="date-select date-year" title="Year"><option value="">Year</option>${yearOpts}</select>
+      <select class="date-select date-day" title="Day"><option value="">Day&nbsp;</option>${dayOpts}</select>
+      <select class="date-select date-year" title="Year"><option value="" selected>Year</option>${yearOpts}</select>
       <button type="button" class="date-today-btn" onclick="setDateToday('${escapeAttr(field.key)}')" title="Set to today">Today</button>
     </div>
     <div class="date-format-row">
