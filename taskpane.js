@@ -90,17 +90,10 @@ async function getAllBodies(context) {
   for (const b of hfBodies) b.load("text");
   await context.sync();
 
-  // Only include non-empty header/footer bodies, deduplicated.
-  // Linked headers (Link to Previous) share the same content across sections.
-  // Word.js has no API to detect linking, so we deduplicate by exact text match:
-  // if two bodies have identical text, they're linked and we only process one.
-  const seenTexts = new Set();
+  // Include all non-empty header/footer bodies (no dedup by text --
+  // two unlinked regions can legitimately have identical text).
   for (const b of hfBodies) {
-    const t = b.text && b.text.trim();
-    if (t && !seenTexts.has(t)) {
-      seenTexts.add(t);
-      bodies.push(b);
-    }
+    if (b.text && b.text.trim()) bodies.push(b);
   }
   return bodies;
 }
@@ -166,15 +159,11 @@ async function scanDocument() {
       }
       await context.sync();
 
-      // Combine body + deduplicated header/footer text for placeholder detection
+      // Combine body + header/footer text for placeholder detection
+      // (duplicate keys from linked headers are harmless -- deduped via Set below)
       let raw = body.text || "";
-      const seenHfTexts = new Set();
       for (const hf of hfBodies) {
-        const t = hf.text && hf.text.trim();
-        if (t && !seenHfTexts.has(t)) {
-          seenHfTexts.add(t);
-          raw += " " + hf.text;
-        }
+        if (hf.text && hf.text.trim()) raw += " " + hf.text;
       }
       const matches = raw.match(/\{\{(\w+)\}\}/g) || [];
       const docKeys = [...new Set(matches)].map((m) => m.replace(/\{\{|\}\}/g, ""));
@@ -537,15 +526,24 @@ async function fillDocument() {
           }
           totalReplaced += existing.items.length;
         } else {
-          // First fill: search all bodies (body + headers/footers), replace, and wrap
-          const ranges = await searchAllBodies(context, `{{${key}}}`, { matchCase: true });
-          totalReplaced += ranges.length;
-          for (const range of ranges) {
-            range.insertText(value, Word.InsertLocation.replace);
-            const cc = range.insertContentControl();
-            cc.tag = key;
-            cc.title = key;
-            cc.appearance = Word.ContentControlAppearance.hidden;
+          // First fill: search each body sequentially so linked headers
+          // naturally dedupe (placeholder is gone by the second pass)
+          const bodies = await getAllBodies(context);
+          for (const b of bodies) {
+            const results = b.search(`{{${key}}}`, { matchCase: true });
+            results.load("items");
+            await context.sync();
+            for (const range of results.items) {
+              range.insertText(value, Word.InsertLocation.replace);
+              const cc = range.insertContentControl();
+              cc.tag = key;
+              cc.title = key;
+              cc.appearance = Word.ContentControlAppearance.hidden;
+            }
+            if (results.items.length > 0) {
+              totalReplaced += results.items.length;
+              await context.sync();
+            }
           }
         }
         await context.sync();
@@ -814,15 +812,10 @@ async function computeDocumentFingerprint() {
       }
       await context.sync();
 
-      // Combine all text sources, deduplicating linked headers/footers
+      // Combine all text sources
       let raw = body.text || "";
-      const seenFpTexts = new Set();
       for (const hf of hfBodies) {
-        const t = hf.text && hf.text.trim();
-        if (t && !seenFpTexts.has(t)) {
-          seenFpTexts.add(t);
-          raw += " " + hf.text;
-        }
+        if (hf.text && hf.text.trim()) raw += " " + hf.text;
       }
 
       // Remove filled values (content control text) so fingerprint is stable after fill
@@ -1133,18 +1126,28 @@ async function confirmReplace(replaceAll) {
   try {
     let count = 0;
     await Word.run(async (context) => {
-      const items = await searchAllBodies(context, text, { matchCase: true });
-      if (items.length === 0) return;
       if (replaceAll) {
-        count = items.length;
-        items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+        // Process each body sequentially so linked headers don't double-replace
+        const bodies = await getAllBodies(context);
+        for (const b of bodies) {
+          const results = b.search(text, { matchCase: true });
+          results.load("items");
+          await context.sync();
+          if (results.items.length > 0) {
+            count += results.items.length;
+            results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+            await context.sync();
+          }
+        }
       } else {
-        // Use the stored occurrence index if available, otherwise fall back to first
+        // Single occurrence: use searchAllBodies (read then one replace)
+        const items = await searchAllBodies(context, text, { matchCase: true });
+        if (items.length === 0) return;
         const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
         count = 1;
         items[idx].insertText(`{{${name}}}`, Word.InsertLocation.replace);
+        await context.sync();
       }
-      await context.sync();
     });
     if (count > 0) onPlaceholderCreated(name, count);
   } catch (err) {
