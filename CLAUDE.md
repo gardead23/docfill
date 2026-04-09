@@ -189,15 +189,16 @@ Uses system font stack: `"Segoe UI", -apple-system, BlinkMacSystemFont, system-u
 ### Completed
 - Privacy policy page (`privacy.html`) — describes local-only data handling
 - Support page (`support.html`) — quick start guide, FAQ, contact email (support@smplhq.com)
-- Manifest updated: `<PrivacyUrl>`, `<SupportUrl>`, `<LongDescription>`, correct icon sizes (64/128)
+- Manifest updated: `<SupportUrl>`, correct icon sizes (64/128). Passes `npx office-addin-manifest validate`.
 - Icon sizes generated: 16, 32, 64, 80, 128px
+- **Note:** `<LongDescription>` and `<PrivacyUrl>` are NOT valid in the XML manifest schema — they must be entered in Partner Center during submission, not in manifest.xml.
 
 ### Remaining Before Submission
 - [ ] Create Microsoft Partner Center account ($19 individual / $99 company)
 - [ ] Complete identity verification and tax/payout profile
 - [ ] Take screenshots (1366x768 recommended) showing scan, fill, and create workflows
 - [ ] Write testing instructions for Microsoft reviewer
-- [ ] Validate manifest: `npx office-addin-manifest validate manifest.xml`
+- [ ] Enter long description and privacy policy URL in Partner Center (not in manifest.xml — schema rejects them there)
 - [ ] Test add-in in Word for the web (reviewers often test there first)
 - [ ] Submit via Partner Center > Marketplace offers > Office Add-ins
 

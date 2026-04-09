@@ -11,11 +11,9 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DocFill"/>
   <Description DefaultValue="Fill {{placeholders}} in your Word templates with a simple form."/>
-  <LongDescription DefaultValue="Create reusable document templates with {{placeholder}} markers, then fill them instantly using a simple form. Supports text, date, and long-text fields with smart auto-detection, format options, and one-click reset to the original template."/>
   <IconUrl DefaultValue="https://docfill.smplhq.com/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://docfill.smplhq.com/icon-128.png"/>
   <SupportUrl DefaultValue="https://docfill.smplhq.com/support.html"/>
-  <PrivacyUrl DefaultValue="https://docfill.smplhq.com/privacy.html"/>
 
   <Hosts>
     <Host Name="Document"/>
