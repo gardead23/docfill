@@ -670,13 +670,23 @@ async function confirmReset() {
 
   try {
     await Word.run(async (context) => {
-      // Reset each filled field via its content control
+      // Phase 1: replace filled text with placeholders inside content controls
       for (const key of Object.keys(lastFilledValues)) {
         const ccs = context.document.contentControls.getByTag(key);
         ccs.load("items");
         await context.sync();
         for (const cc of ccs.items) {
           cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
+        }
+        await context.sync();
+      }
+
+      // Phase 2: remove content control wrappers (must be a separate sync)
+      for (const key of Object.keys(lastFilledValues)) {
+        const ccs = context.document.contentControls.getByTag(key);
+        ccs.load("items");
+        await context.sync();
+        for (const cc of ccs.items) {
           cc.delete(true); // keep the placeholder text, remove the control wrapper
         }
         await context.sync();
@@ -710,9 +720,17 @@ async function resetField(key) {
 
       if (ccs.items.length > 0) {
         found = true;
+        // Phase 1: replace text
         for (const cc of ccs.items) {
           cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
-          cc.delete(true); // keep the placeholder text, remove the control wrapper
+        }
+        await context.sync();
+        // Phase 2: remove control wrappers (separate sync)
+        const ccs2 = context.document.contentControls.getByTag(key);
+        ccs2.load("items");
+        await context.sync();
+        for (const cc of ccs2.items) {
+          cc.delete(true);
         }
         await context.sync();
       }
