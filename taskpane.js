@@ -114,6 +114,32 @@ async function searchAllBodies(context, searchText, options) {
   return allResults.flatMap((r) => r.items);
 }
 
+/**
+ * Deduplicate ranges that point to the same location (e.g., from linked headers).
+ * Uses Range.compareLocationWith() to detect overlapping ranges.
+ * Must be called inside Word.run.
+ */
+async function dedupeRanges(context, ranges) {
+  if (ranges.length <= 1) return ranges;
+  const unique = [ranges[0]];
+  for (let i = 1; i < ranges.length; i++) {
+    let isDuplicate = false;
+    for (const kept of unique) {
+      const loc = ranges[i].compareLocationWith(kept);
+      await context.sync();
+      if (loc.value === "Equal" || loc.value === "Inside" || loc.value === "Contains" ||
+          loc.value === Word.LocationRelation.equal ||
+          loc.value === Word.LocationRelation.inside ||
+          loc.value === Word.LocationRelation.contains) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    if (!isDuplicate) unique.push(ranges[i]);
+  }
+  return unique;
+}
+
 // ── Office Initialization ──────────────────────────────────────────────────────
 
 Office.onReady(function (info) {
@@ -966,7 +992,8 @@ async function fetchCurrentSelection() {
       // If text exists and might have multiple occurrences, find which one is selected
       // Search all bodies (body + headers/footers) to match the replacement domain
       if (lastSelectedText && lastSelectedText.length > 0) {
-        const items = await searchAllBodies(context, lastSelectedText, { matchCase: true });
+        const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: true });
+        const items = await dedupeRanges(context, rawItems);
 
         if (items.length > 1) {
           // Compare each result with the selection to find the matching one
@@ -1056,7 +1083,8 @@ async function createPlaceholder() {
 
   try {
     await Word.run(async (context) => {
-      const items = await searchAllBodies(context, text, { matchCase: true });
+      const rawItems = await searchAllBodies(context, text, { matchCase: true });
+      const items = await dedupeRanges(context, rawItems);
 
       occurrenceCount = items.length;
 
@@ -1140,8 +1168,9 @@ async function confirmReplace(replaceAll) {
           }
         }
       } else {
-        // Single occurrence: use searchAllBodies (read then one replace)
-        const items = await searchAllBodies(context, text, { matchCase: true });
+        // Single occurrence: dedupe linked ranges then replace one
+        const rawItems = await searchAllBodies(context, text, { matchCase: true });
+        const items = await dedupeRanges(context, rawItems);
         if (items.length === 0) return;
         const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
         count = 1;
@@ -1202,7 +1231,8 @@ async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
   try {
     await Word.run(async (context) => {
-      const items = await searchAllBodies(context, `{{${name}}}`, { matchCase: true });
+      const rawItems = await searchAllBodies(context, `{{${name}}}`, { matchCase: true });
+      const items = await dedupeRanges(context, rawItems);
 
       if (items.length === 0) {
         showCreateStatus(`{{${name}}} not found — it may have been filled or removed.`, "error");
