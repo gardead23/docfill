@@ -60,8 +60,14 @@ let lastSelectedOccurrenceIndex = -1;
 
 // ── Document Range Helpers ────────────────────────────────────────────────────
 
-/** Header/footer types to process. */
-const HF_TYPES = [Word.HeaderFooterType.primary, Word.HeaderFooterType.firstPage, Word.HeaderFooterType.evenPages];
+/** Header/footer types to process. Lazily initialized after Office.js loads. */
+let HF_TYPES = null;
+function getHfTypes() {
+  if (!HF_TYPES) {
+    HF_TYPES = [Word.HeaderFooterType.primary, Word.HeaderFooterType.firstPage, Word.HeaderFooterType.evenPages];
+  }
+  return HF_TYPES;
+}
 
 /**
  * Collect all searchable Body objects in the document (body + all header/footer bodies).
@@ -75,7 +81,7 @@ async function getAllBodies(context) {
 
   const hfBodies = [];
   for (const section of sections.items) {
-    for (const hfType of HF_TYPES) {
+    for (const hfType of getHfTypes()) {
       hfBodies.push(section.getHeader(hfType));
       hfBodies.push(section.getFooter(hfType));
     }
@@ -142,7 +148,7 @@ async function scanDocument() {
 
       const hfBodies = [];
       for (const section of sections.items) {
-        for (const hfType of HF_TYPES) {
+        for (const hfType of getHfTypes()) {
           const h = section.getHeader(hfType);
           const f = section.getFooter(hfType);
           h.load("text");
@@ -763,7 +769,7 @@ async function computeDocumentFingerprint() {
 
       const hfBodies = [];
       for (const section of sections.items) {
-        for (const hfType of HF_TYPES) {
+        for (const hfType of getHfTypes()) {
           const h = section.getHeader(hfType);
           const f = section.getFooter(hfType);
           h.load("text");
