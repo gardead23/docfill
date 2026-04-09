@@ -581,8 +581,12 @@ async function fillDocument() {
               }
               totalReplaced += results.items.length;
               await context.sync();
-            } catch {
-              // Linked header/footer already modified — skip silently
+            } catch (bodyErr) {
+              // Linked headers throw GeneralException when their content was
+              // already modified via the linked copy. Log other errors.
+              if (bodyErr.code !== "GeneralException") {
+                console.warn(`DocFill: skipped a region for {{${key}}}:`, bodyErr.message || bodyErr);
+              }
             }
           }
         }
