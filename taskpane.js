@@ -547,52 +547,75 @@ async function fillDocument() {
     let regionsSkipped = 0;
 
     await Word.run(async (context) => {
-      // Load all bodies once (not per-key)
-      const bodies = await getAllBodies(context);
+      const keys = Object.keys(toFill);
 
-      for (const [key, value] of Object.entries(toFill)) {
-        // Check if content controls already exist for this field (refill case)
-        const existing = context.document.contentControls.getByTag(key);
-        existing.load("items");
-        await context.sync();
+      // ── Phase 1: batch-check all keys for existing content controls (refill) ──
+      const ccCollections = {};
+      for (const key of keys) {
+        ccCollections[key] = context.document.contentControls.getByTag(key);
+        ccCollections[key].load("items");
+      }
+      await context.sync();
 
-        if (existing.items.length > 0) {
-          // Refill: update text inside existing content controls
-          for (const cc of existing.items) {
-            cc.insertText(value, Word.InsertLocation.replace);
-          }
-          totalReplaced += existing.items.length;
+      const refillKeys = [];
+      const firstFillKeys = [];
+      for (const key of keys) {
+        if (ccCollections[key].items.length > 0) {
+          refillKeys.push(key);
         } else {
-          // First fill: search each body sequentially so linked headers
-          // naturally dedupe (placeholder is gone by the second pass)
-          for (const b of bodies) {
-            try {
-              const results = b.search(`{{${key}}}`, { matchCase: true });
-              results.load("items");
-              await context.sync();
-              if (results.items.length === 0) continue;
-              for (const range of results.items) {
-                // Wrap in content control FIRST, then replace text inside it.
-                // This ensures multi-paragraph text stays fully inside the CC.
+          firstFillKeys.push(key);
+        }
+      }
+
+      // ── Phase 2: batch-refill all existing content controls in one sync ──
+      if (refillKeys.length > 0) {
+        for (const key of refillKeys) {
+          for (const cc of ccCollections[key].items) {
+            cc.insertText(toFill[key], Word.InsertLocation.replace);
+          }
+          totalReplaced += ccCollections[key].items.length;
+        }
+        await context.sync();
+      }
+
+      // ── Phase 3: first-fill — process each body, batch all key searches per body ──
+      if (firstFillKeys.length > 0) {
+        const bodies = await getAllBodies(context);
+
+        for (const b of bodies) {
+          try {
+            // Queue all key searches on this body in one sync
+            const searches = {};
+            for (const key of firstFillKeys) {
+              searches[key] = b.search(`{{${key}}}`, { matchCase: true });
+              searches[key].load("items");
+            }
+            await context.sync();
+
+            // Process all results and queue replacements
+            let anyFound = false;
+            for (const key of firstFillKeys) {
+              for (const range of searches[key].items) {
                 const cc = range.insertContentControl();
                 cc.tag = key;
                 cc.title = key;
                 cc.appearance = Word.ContentControlAppearance.hidden;
-                cc.insertText(value, Word.InsertLocation.replace);
+                cc.insertText(toFill[key], Word.InsertLocation.replace);
+                anyFound = true;
               }
-              totalReplaced += results.items.length;
-              await context.sync();
-            } catch (bodyErr) {
-              if (bodyErr.code === "GeneralException") {
-                // Linked header already modified via linked copy — expected, skip
-              } else {
-                regionsSkipped++;
-                console.warn(`DocFill: skipped a region for {{${key}}}:`, bodyErr.message || bodyErr);
-              }
+              totalReplaced += searches[key].items.length;
+            }
+
+            if (anyFound) await context.sync();
+          } catch (bodyErr) {
+            if (bodyErr.code === "GeneralException") {
+              // Linked header already modified via linked copy — expected
+            } else {
+              regionsSkipped++;
+              console.warn("DocFill: skipped a region:", bodyErr.message || bodyErr);
             }
           }
         }
-        await context.sync();
       }
     });
 
