@@ -8,7 +8,7 @@ import {
   daysInMonth,
   formatDate,
   buildStorageKey,
-} from "../lib/pure.js";
+} from "../lib/pure.mjs";
 
 // ── toTitleCase ──────────────────────────────────────────────────────────────
 

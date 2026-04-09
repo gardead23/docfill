@@ -162,8 +162,21 @@ async function scanDocument() {
 
       // Build a map of currently filled fields from content controls
       const ccFilledKeys = new Set();
+      const ccFilledValues = {};
       for (const cc of allCCs.items) {
-        if (cc.tag) ccFilledKeys.add(cc.tag);
+        if (cc.tag) {
+          ccFilledKeys.add(cc.tag);
+          // Store the first value found for each tag (for hydration on reopen)
+          if (!ccFilledValues[cc.tag]) ccFilledValues[cc.tag] = cc.text;
+        }
+      }
+
+      // Hydrate lastFilledValues from content controls for keys not yet in memory
+      // (handles reopen: content controls persist but in-memory state is empty)
+      for (const key of ccFilledKeys) {
+        if (!lastFilledValues[key] && !docKeys.includes(key)) {
+          lastFilledValues[key] = ccFilledValues[key] || "";
+        }
       }
 
       // Sync state with doc: if a key appears as a {{placeholder}} it wasn't filled
@@ -178,10 +191,10 @@ async function scanDocument() {
         }
       }
       if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
+      if (ccFilledKeys.size > 0 && Object.keys(lastFilledValues).length > 0) hasFilled = true;
 
-      // Merge with previously filled fields so they stay visible in the form
-      const filledNotInDoc = Object.keys(lastFilledValues).filter((k) => !docKeys.includes(k));
-      const allKeys = new Set([...docKeys, ...filledNotInDoc]);
+      // Merge: unfilled placeholders + filled fields (from memory and content controls)
+      const allKeys = new Set([...docKeys, ...Object.keys(lastFilledValues)]);
 
       // Preserve original field order; append any brand-new keys at the end
       const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.has(k));
@@ -728,19 +741,53 @@ const LS_PREFIX = "template-filler:";
 let documentFingerprint = "";
 
 /**
- * Build a stable fingerprint from the document's body text.
- * Uses the first 200 non-placeholder characters + placeholder key set.
- * This distinguishes templates that share the same keys but have different surrounding text.
+ * Build a stable fingerprint from the document's template text.
+ * Includes body + all header/footer text.
+ * Strips both {{placeholder}} patterns and content-control text (filled values)
+ * so the fingerprint is the same before and after filling.
  */
 async function computeDocumentFingerprint() {
   try {
     await Word.run(async (context) => {
-      context.document.body.load("text");
+      const body = context.document.body;
+      body.load("text");
+
+      // Load content controls to identify filled regions
+      const allCCs = context.document.contentControls;
+      allCCs.load("items,text");
+
+      // Load header/footer text
+      const sections = context.document.sections;
+      sections.load("items");
       await context.sync();
-      const raw = context.document.body.text || "";
-      // Strip placeholders and whitespace, take first 200 chars as a stable prefix
-      const stripped = raw.replace(/\{\{\w+\}\}/g, "").replace(/\s+/g, " ").trim().substring(0, 200);
-      // Simple hash: djb2
+
+      const hfBodies = [];
+      for (const section of sections.items) {
+        for (const hfType of HF_TYPES) {
+          const h = section.getHeader(hfType);
+          const f = section.getFooter(hfType);
+          h.load("text");
+          f.load("text");
+          hfBodies.push(h, f);
+        }
+      }
+      await context.sync();
+
+      // Combine all text sources
+      let raw = body.text || "";
+      for (const hf of hfBodies) {
+        if (hf.text && hf.text.trim()) raw += " " + hf.text;
+      }
+
+      // Remove filled values (content control text) so fingerprint is stable after fill
+      for (const cc of allCCs.items) {
+        if (cc.text) raw = raw.replace(cc.text, "");
+      }
+
+      // Strip {{placeholders}} and whitespace, take first 300 chars
+      const stripped = raw.replace(/\{\{\w+\}\}/g, "").replace(/\s+/g, " ").trim().substring(0, 300);
+
+      // djb2 hash
       let hash = 5381;
       for (let i = 0; i < stripped.length; i++) {
         hash = ((hash << 5) + hash + stripped.charCodeAt(i)) >>> 0;
@@ -877,15 +924,14 @@ async function fetchCurrentSelection() {
       lastSelectedOccurrenceIndex = -1;
 
       // If text exists and might have multiple occurrences, find which one is selected
+      // Search all bodies (body + headers/footers) to match the replacement domain
       if (lastSelectedText && lastSelectedText.length > 0) {
-        const results = context.document.body.search(lastSelectedText, { matchCase: true });
-        results.load("items");
-        await context.sync();
+        const items = await searchAllBodies(context, lastSelectedText, { matchCase: true });
 
-        if (results.items.length > 1) {
+        if (items.length > 1) {
           // Compare each result with the selection to find the matching one
-          for (let i = 0; i < results.items.length; i++) {
-            const loc = sel.compareLocationWith(results.items[i]);
+          for (let i = 0; i < items.length; i++) {
+            const loc = sel.compareLocationWith(items[i]);
             await context.sync();
             if (loc.value === Word.LocationRelation.equal ||
                 loc.value === Word.LocationRelation.contains ||
