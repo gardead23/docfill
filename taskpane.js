@@ -546,6 +546,9 @@ async function fillDocument() {
     let totalReplaced = 0;
 
     await Word.run(async (context) => {
+      // Load all bodies once (not per-key)
+      const bodies = await getAllBodies(context);
+
       for (const [key, value] of Object.entries(toFill)) {
         // Check if content controls already exist for this field (refill case)
         const existing = context.document.contentControls.getByTag(key);
@@ -561,23 +564,23 @@ async function fillDocument() {
         } else {
           // First fill: search each body sequentially so linked headers
           // naturally dedupe (placeholder is gone by the second pass)
-          const bodies = await getAllBodies(context);
           for (const b of bodies) {
             try {
               const results = b.search(`{{${key}}}`, { matchCase: true });
               results.load("items");
               await context.sync();
+              if (results.items.length === 0) continue;
               for (const range of results.items) {
-                range.insertText(value, Word.InsertLocation.replace);
+                // Wrap in content control FIRST, then replace text inside it.
+                // This ensures multi-paragraph text stays fully inside the CC.
                 const cc = range.insertContentControl();
                 cc.tag = key;
                 cc.title = key;
                 cc.appearance = Word.ContentControlAppearance.hidden;
+                cc.insertText(value, Word.InsertLocation.replace);
               }
-              if (results.items.length > 0) {
-                totalReplaced += results.items.length;
-                await context.sync();
-              }
+              totalReplaced += results.items.length;
+              await context.sync();
             } catch {
               // Linked header/footer already modified — skip silently
             }
