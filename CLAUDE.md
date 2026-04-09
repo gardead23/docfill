@@ -39,10 +39,9 @@ Two-tab layout. Default tab: **Fill** (preserves existing behaviour). **Create**
 ## Key Architectural Decisions
 
 ### State model — Fill mode
-Five top-level state variables:
+Four top-level state variables:
 - `currentFields` — ordered array of `{ key, label, type, dateFormat? }` from last scan
-- `currentStorageKey` — localStorage key for field config persistence
-- `originalOoxml` — OOXML snapshot of the document; used for full document restore on reset
+- `currentStorageKey` — localStorage key for field config persistence (includes document fingerprint)
 - `hasFilled` — whether any fills have been applied in this session
 - `lastFilledValues` — `Record<string, string>` mapping field keys to their last-filled values
 
@@ -51,28 +50,24 @@ Five top-level state variables:
 - `lastSelectedText` — text stored from the last `DocumentSelectionChanged` event
 - `lastSuggestedName` — tracks the last auto-suggested placeholder name so manual edits aren't overwritten
 - `createdPlaceholders` — `{ name: string, count: number }[]` list of created placeholders this session
-- `pendingCreateText / pendingCreateName` — held during the multi-occurrence confirmation flow
+- `pendingCreateText / pendingCreateName / pendingCreateIndex` — held during the multi-occurrence confirmation flow
 - `chipNavIndex` — `Record<string, number>` tracks which occurrence to navigate to next per placeholder
 - `selectionDebounceTimer / selectionFetchInProgress` — guard against overlapping Word.run calls
-
-### OOXML snapshot (`originalOoxml`)
-- Captured in two places:
-  1. `scanDocument()` via `body.getOoxml()`, **only when `lastFilledValues` is empty** — i.e., at the true template state before any fills
-  2. **Right before the first fill** in `fillDocument()`, again only when `lastFilledValues` is empty — this captures any text the user added to the document *after* scanning, so reset restores to the complete pre-fill state
-- Used by `confirmReset()` to restore the full document via `body.insertOoxml(..., Word.InsertLocation.replace)`
-- Stays in JS memory only; never sent to any server; clears when task pane closes
 
 ### Content controls for fill tracking
 When `fillDocument()` replaces a `{{placeholder}}` with a value, it wraps the inserted text in a hidden content control (`appearance: "hidden"`) tagged with the placeholder key (`cc.tag = key`). This provides stable document anchors for refill and reset operations.
 
-**First fill:** Search for `{{key}}` text, replace with value, wrap in tagged content control.
+**First fill:** Search all bodies (body + headers/footers) for `{{key}}` text, replace with value, wrap in tagged content control.
 **Refill:** Find content controls by tag (`contentControls.getByTag(key)`), replace their text directly. No text-search needed.
 **Per-field reset:** Find content control by tag, replace text with `{{key}}`, unwrap control (`cc.delete(false)`).
-**Full document reset:** Still uses the OOXML snapshot approach (replaces entire body).
+**Reset all fields:** Iterates all keys in `lastFilledValues`, finds their content controls, replaces with `{{key}}`, unwraps. Preserves any edits the user made after filling (no OOXML rollback).
 
 Content controls persist across save/reopen (they are native Word OOXML elements: `<w:sdt>`). Tags are not unique -- multiple occurrences of the same placeholder share the same tag, and `getByTag()` returns all of them.
 
 `lastFilledValues` is still maintained for UI state (form values, reset button visibility) but is no longer used for document-level text searching.
+
+### Header/footer support
+All scan, fill, and create operations process the full document: body + all section headers and footers (Primary, FirstPage, EvenPages). Helper functions `getAllBodies(context)` and `searchAllBodies(context, text, options)` enumerate all non-empty Body objects. Content controls in headers/footers are found by the same `contentControls.getByTag()` call (it's document-wide).
 
 ### Selection monitoring in Create mode
 - `DocumentSelectionChanged` event fires on every cursor move — always registered, but handler returns immediately if `activeTab !== 'create'`
@@ -129,7 +124,11 @@ After a fill, rescanning finds fewer placeholders (consumed ones are gone). To p
 When `scanDocument()` runs, it checks both raw `{{placeholder}}` text in the document body and the presence of content controls. For any key that appears as `{{placeholder}}` text, that key is deleted from `lastFilledValues` (the fill was undone). Additionally, any key in `lastFilledValues` that no longer has a corresponding content control is also removed. This handles cases where the user undid a fill via Ctrl+Z (which removes both the text change and the content control), keeping DocFill's state consistent with the document.
 
 ### localStorage persistence
-Field labels, types, and per-field date formats are saved keyed by the sorted+joined set of placeholder keys. Same template shape → same configs on next open. Prefix: `template-filler:` (kept as-is to avoid breaking existing data). Global date format stored separately under `docfill:dateFormat`.
+Field labels, types, and per-field date formats are saved keyed by document fingerprint + sorted placeholder keys. The fingerprint is a djb2 hash of the first 200 non-placeholder characters of the document body, distinguishing templates that share the same placeholder names but have different surrounding text.
+
+Key format: `template-filler:{fingerprint}:{sorted,keys}`. Legacy keys without a fingerprint are auto-migrated on first load via `loadFieldConfigsWithMigration()`.
+
+Global date format stored separately under `docfill:dateFormat`.
 
 ## Icons
 
@@ -164,19 +163,32 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 
 ## Known Limitations
 
-- **Document body only:** All scan/fill/create operations use `context.document.body`. Headers, footers, text boxes, and other story ranges are not scanned or filled. Documented in README and support page.
-- **Restore is full-document rollback:** "Restore Original Document" replaces the entire document body with the pre-fill OOXML snapshot. Any edits made after filling (even unrelated prose) are lost. The confirmation dialog warns about this explicitly.
+- **Text boxes and shapes** are not accessible via the Word.js API. Placeholders inside text boxes, watermarks, or floating shapes cannot be scanned or filled.
 - **Occurrence targeting fallback:** In Create mode, when the selected text has multiple occurrences, `fetchCurrentSelection()` attempts to identify the exact selected occurrence via `Range.compareLocationWith()`. If it succeeds, the button shows "This occurrence (#N)." If it fails (e.g., selection changed between detection and button click), it falls back to the first occurrence.
+
+## Testing
+
+Pure logic functions are extracted to `lib/pure.js` and tested with Vitest:
+
+```bash
+npm test        # run once
+npm run test:watch  # watch mode
+```
+
+32 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`.
+
+CI runs on every push/PR to `main` via GitHub Actions (`.github/workflows/ci.yml`): syntax check, manifest validation, and test suite.
 
 ## Office.js Gotchas
 
 - `body.search()` is case-sensitive when `matchCase: true` — use consistently
 - All Word API calls must be inside `Word.run(async context => { ... await context.sync() })`
-- `body.getOoxml()` returns a proxy object; read `.value` after `context.sync()`
 - `Word.InsertLocation.replace` is the correct enum for in-place text substitution
 - `Range.select()` scrolls to and highlights a range in the document (WordApi 1.1)
 - `window.confirm()` is silently blocked in Office add-in webviews — never use it
 - Minimum API requirement: `WordApi 1.3` (set in manifest `<Requirements>`)
+- Headers/footers accessed via `section.getHeader(type)` / `section.getFooter(type)` — returns a `Body` with same API as main body
+- Three header/footer types must be checked separately: `Primary`, `FirstPage`, `EvenPages`
 
 ## Fonts
 

@@ -11,7 +11,7 @@ A Microsoft Word task pane add-in for creating and filling document templates. B
 
 ### Filling a template
 
-1. Add `{{placeholder_name}}` markers to the body of your Word document
+1. Add `{{placeholder_name}}` markers to your Word document (body, headers, and footers)
 2. Open the DocFill task pane (Home ribbon → **DocFill** button)
 3. Go to the **Fill** tab and click **Scan Document** — the add-in detects all placeholders
 4. Customize labels and field types (Text, Date, Long text) if needed
@@ -145,11 +145,11 @@ Then update `<SourceLocation>` in `manifest.xml` to `http://localhost:3000/taskp
 - **Navigate placeholders:** In Create mode, click any chip in "Created so far" to highlight that placeholder in the document; click again to cycle through multiple occurrences
 - **Re-fill:** Change a value and click Fill Document again — it updates the document without needing to clear first
 - **Per-field undo:** Click the ↺ icon on any filled field to restore just that placeholder
-- **Full reset:** Click **Restore Original Document** to revert the entire document to its pre-fill state. **Note:** this also removes any edits you made after filling
+- **Full reset:** Click **Reset All Fields** to restore all filled values back to their `{{placeholder}}` markers. Any other edits you made to the document are preserved
 - **Rescan:** Click **↺ Rescan** to pick up any new placeholders added to the document
 - **Labels are saved** per template shape — your customizations persist across sessions
 - **Duplicate values blocked:** If two fields have the same value, Fill Document will stop and tell you which fields conflict
-- **Document body only:** DocFill scans and fills placeholders in the document body. Headers, footers, and other special regions are not currently supported
+- **Headers and footers supported:** DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported
 
 ---
 

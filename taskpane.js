@@ -7,7 +7,6 @@
 /** @type {{ key: string, label: string, type: string, dateFormat?: string }[]} */
 let currentFields = [];
 let currentStorageKey = "";
-let originalOoxml = null;
 let hasFilled = false;
 /** @type {Record<string, string>} */
 let lastFilledValues = {};
@@ -59,6 +58,55 @@ let selectionFetchInProgress = false;
 /** Index of the selected occurrence among all matches (for "This occurrence" targeting). -1 = unknown. */
 let lastSelectedOccurrenceIndex = -1;
 
+// ── Document Range Helpers ────────────────────────────────────────────────────
+
+/** Header/footer types to process. */
+const HF_TYPES = [Word.HeaderFooterType.primary, Word.HeaderFooterType.firstPage, Word.HeaderFooterType.evenPages];
+
+/**
+ * Collect all searchable Body objects in the document (body + all header/footer bodies).
+ * Must be called inside Word.run. Returns an array of Body objects after sync.
+ */
+async function getAllBodies(context) {
+  const bodies = [context.document.body];
+  const sections = context.document.sections;
+  sections.load("items");
+  await context.sync();
+
+  const hfBodies = [];
+  for (const section of sections.items) {
+    for (const hfType of HF_TYPES) {
+      hfBodies.push(section.getHeader(hfType));
+      hfBodies.push(section.getFooter(hfType));
+    }
+  }
+  // Load text to check which are non-empty
+  for (const b of hfBodies) b.load("text");
+  await context.sync();
+
+  // Only include non-empty header/footer bodies
+  for (const b of hfBodies) {
+    if (b.text && b.text.trim()) bodies.push(b);
+  }
+  return bodies;
+}
+
+/**
+ * Search for text across all document bodies (body + headers/footers).
+ * Returns a flat array of Range items. Must be called inside Word.run.
+ */
+async function searchAllBodies(context, searchText, options) {
+  const bodies = await getAllBodies(context);
+  const allResults = [];
+  for (const body of bodies) {
+    const results = body.search(searchText, options);
+    results.load("items");
+    allResults.push(results);
+  }
+  await context.sync();
+  return allResults.flatMap((r) => r.items);
+}
+
 // ── Office Initialization ──────────────────────────────────────────────────────
 
 Office.onReady(function (info) {
@@ -77,16 +125,38 @@ async function scanDocument() {
   setScanButtonLoading(true);
 
   try {
+    // Compute fingerprint before scanning so storage key is document-scoped
+    await computeDocumentFingerprint();
+
     await Word.run(async (context) => {
       const body = context.document.body;
-      const ooxmlResult = body.getOoxml();
       body.load("text");
       // Also load content controls to detect filled fields
       const allCCs = context.document.contentControls;
       allCCs.load("items,tag,text");
+
+      // Load header/footer text for placeholder scanning
+      const sections = context.document.sections;
+      sections.load("items");
       await context.sync();
 
-      const raw = body.text || "";
+      const hfBodies = [];
+      for (const section of sections.items) {
+        for (const hfType of HF_TYPES) {
+          const h = section.getHeader(hfType);
+          const f = section.getFooter(hfType);
+          h.load("text");
+          f.load("text");
+          hfBodies.push(h, f);
+        }
+      }
+      await context.sync();
+
+      // Combine body + header/footer text for placeholder detection
+      let raw = body.text || "";
+      for (const hf of hfBodies) {
+        if (hf.text && hf.text.trim()) raw += " " + hf.text;
+      }
       const matches = raw.match(/\{\{(\w+)\}\}/g) || [];
       const docKeys = [...new Set(matches)].map((m) => m.replace(/\{\{|\}\}/g, ""));
 
@@ -108,11 +178,6 @@ async function scanDocument() {
         }
       }
       if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
-
-      // Freeze OOXML snapshot when nothing is filled (or everything was undone)
-      if (Object.keys(lastFilledValues).length === 0) {
-        originalOoxml = ooxmlResult.value;
-      }
 
       // Merge with previously filled fields so they stay visible in the form
       const filledNotInDoc = Object.keys(lastFilledValues).filter((k) => !docKeys.includes(k));
@@ -137,7 +202,7 @@ async function scanDocument() {
       }
 
       currentStorageKey = buildStorageKey(keys);
-      const saved = loadFieldConfigs(currentStorageKey);
+      const saved = loadFieldConfigsWithMigration(currentStorageKey, keys);
 
       currentFields = keys.map((key) => {
         const savedType = saved[key]?.type === "number" ? "text" : saved[key]?.type; // migrate old "number"
@@ -419,18 +484,6 @@ async function fillDocument() {
     document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
   });
 
-  // Re-capture OOXML right before the first fill so it includes any text
-  // the user added to the document after the last scan
-  if (Object.keys(lastFilledValues).length === 0) {
-    try {
-      await Word.run(async (context) => {
-        const ooxmlResult = context.document.body.getOoxml();
-        await context.sync();
-        originalOoxml = ooxmlResult.value;
-      });
-    } catch { /* keep existing snapshot */ }
-  }
-
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Filling...';
   hideStatus();
@@ -452,12 +505,10 @@ async function fillDocument() {
           }
           totalReplaced += existing.items.length;
         } else {
-          // First fill: search for raw placeholder text, replace, and wrap
-          const results = context.document.body.search(`{{${key}}}`, { matchCase: true });
-          results.load("items");
-          await context.sync();
-          totalReplaced += results.items.length;
-          for (const range of results.items) {
+          // First fill: search all bodies (body + headers/footers), replace, and wrap
+          const ranges = await searchAllBodies(context, `{{${key}}}`, { matchCase: true });
+          totalReplaced += ranges.length;
+          for (const range of ranges) {
             range.insertText(value, Word.InsertLocation.replace);
             const cc = range.insertContentControl();
             cc.tag = key;
@@ -555,7 +606,7 @@ function formatDate(isoDate, format) {
 // ── Clear Form ─────────────────────────────────────────────────────────────────
 
 async function clearForm() {
-  if (hasFilled && originalOoxml) {
+  if (hasFilled && Object.keys(lastFilledValues).length > 0) {
     showClearConfirm();
     return;
   }
@@ -565,10 +616,10 @@ async function clearForm() {
 function showClearConfirm() {
   const el = document.getElementById("status");
   el.innerHTML = `
-    <div style="margin-bottom:6px;font-weight:600">Restore original document?</div>
-    <div style="margin-bottom:10px;font-size:12px;color:#64748b">This will undo all filled values and any edits you made after filling. The document will be restored to its pre-fill state.</div>
+    <div style="margin-bottom:6px;font-weight:600">Reset all filled fields?</div>
+    <div style="margin-bottom:10px;font-size:12px;color:#64748b">All filled values will be replaced with their original {{placeholders}}. Other edits you made to the document will be preserved.</div>
     <div style="display:flex;gap:8px">
-      <button onclick="confirmReset()" style="flex:1;padding:7px 0;background:#dc2626;color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Restore Original</button>
+      <button onclick="confirmReset()" style="flex:1;padding:7px 0;background:#dc2626;color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Reset All Fields</button>
       <button onclick="hideStatus()" style="padding:7px 12px;background:none;border:1.5px solid #bfdbfe;border-radius:7px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
     </div>
   `;
@@ -583,17 +634,26 @@ async function confirmReset() {
 
   try {
     await Word.run(async (context) => {
-      context.document.body.insertOoxml(originalOoxml, Word.InsertLocation.replace);
-      await context.sync();
+      // Reset each filled field via its content control
+      for (const key of Object.keys(lastFilledValues)) {
+        const ccs = context.document.contentControls.getByTag(key);
+        ccs.load("items");
+        await context.sync();
+        for (const cc of ccs.items) {
+          cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
+          cc.delete(false); // unwrap, leaving the placeholder text
+        }
+        await context.sync();
+      }
     });
     hasFilled = false;
   } catch (err) {
     showStatus("Failed to reset document: " + err.message, "error");
-    if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Restore Original Document"; }
+    if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Reset All Fields"; }
     return;
   }
 
-  if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Restore Original Document"; }
+  if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Reset All Fields"; }
   doFormClear();
 }
 
@@ -664,8 +724,61 @@ function doFormClear() {
 
 const LS_PREFIX = "template-filler:";
 
+/** A short fingerprint of the document to scope persistence. */
+let documentFingerprint = "";
+
+/**
+ * Build a stable fingerprint from the document's body text.
+ * Uses the first 200 non-placeholder characters + placeholder key set.
+ * This distinguishes templates that share the same keys but have different surrounding text.
+ */
+async function computeDocumentFingerprint() {
+  try {
+    await Word.run(async (context) => {
+      context.document.body.load("text");
+      await context.sync();
+      const raw = context.document.body.text || "";
+      // Strip placeholders and whitespace, take first 200 chars as a stable prefix
+      const stripped = raw.replace(/\{\{\w+\}\}/g, "").replace(/\s+/g, " ").trim().substring(0, 200);
+      // Simple hash: djb2
+      let hash = 5381;
+      for (let i = 0; i < stripped.length; i++) {
+        hash = ((hash << 5) + hash + stripped.charCodeAt(i)) >>> 0;
+      }
+      documentFingerprint = hash.toString(36);
+    });
+  } catch {
+    documentFingerprint = "";
+  }
+}
+
 function buildStorageKey(keys) {
-  return LS_PREFIX + [...keys].sort().join(",");
+  const base = [...keys].sort().join(",");
+  return documentFingerprint
+    ? LS_PREFIX + documentFingerprint + ":" + base
+    : LS_PREFIX + base;
+}
+
+/**
+ * Try to load configs from the fingerprinted key first.
+ * If nothing found and a fingerprint is set, fall back to the old un-fingerprinted key
+ * and migrate the data forward.
+ */
+function loadFieldConfigsWithMigration(fingerprintedKey, keys) {
+  let data = loadFieldConfigs(fingerprintedKey);
+  if (Object.keys(data).length > 0) return data;
+
+  // Fall back to legacy key (no fingerprint)
+  if (documentFingerprint) {
+    const legacyKey = LS_PREFIX + [...keys].sort().join(",");
+    data = loadFieldConfigs(legacyKey);
+    if (Object.keys(data).length > 0) {
+      // Migrate to fingerprinted key
+      try { localStorage.setItem(fingerprintedKey, JSON.stringify(data)); } catch { /* ignore */ }
+      return data;
+    }
+  }
+  return {};
 }
 
 function loadFieldConfigs(storageKey) {
@@ -857,11 +970,9 @@ async function createPlaceholder() {
 
   try {
     await Word.run(async (context) => {
-      const results = context.document.body.search(text, { matchCase: true });
-      results.load("items");
-      await context.sync();
+      const items = await searchAllBodies(context, text, { matchCase: true });
 
-      occurrenceCount = results.items.length;
+      occurrenceCount = items.length;
 
       if (occurrenceCount === 0) {
         shouldProceed = false;
@@ -877,7 +988,7 @@ async function createPlaceholder() {
         return;
       }
 
-      results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+      items[0].insertText(`{{${name}}}`, Word.InsertLocation.replace);
       await context.sync();
     });
 
@@ -929,18 +1040,16 @@ async function confirmReplace(replaceAll) {
   try {
     let count = 0;
     await Word.run(async (context) => {
-      const results = context.document.body.search(text, { matchCase: true });
-      results.load("items");
-      await context.sync();
-      if (results.items.length === 0) return;
+      const items = await searchAllBodies(context, text, { matchCase: true });
+      if (items.length === 0) return;
       if (replaceAll) {
-        count = results.items.length;
-        results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+        count = items.length;
+        items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
       } else {
         // Use the stored occurrence index if available, otherwise fall back to first
-        const idx = (targetIndex >= 0 && targetIndex < results.items.length) ? targetIndex : 0;
+        const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
         count = 1;
-        results.items[idx].insertText(`{{${name}}}`, Word.InsertLocation.replace);
+        items[idx].insertText(`{{${name}}}`, Word.InsertLocation.replace);
       }
       await context.sync();
     });
@@ -997,30 +1106,28 @@ async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
   try {
     await Word.run(async (context) => {
-      const results = context.document.body.search(`{{${name}}}`, { matchCase: true });
-      results.load("items");
-      await context.sync();
+      const items = await searchAllBodies(context, `{{${name}}}`, { matchCase: true });
 
-      if (results.items.length === 0) {
+      if (items.length === 0) {
         showCreateStatus(`{{${name}}} not found — it may have been filled or removed.`, "error");
         return;
       }
 
       // Sync count if doc has more/fewer occurrences than tracked (e.g. user added one manually)
       const entry = createdPlaceholders.find((e) => e.name === name);
-      if (entry && entry.count !== results.items.length) {
-        entry.count = results.items.length;
+      if (entry && entry.count !== items.length) {
+        entry.count = items.length;
         renderCreatedList();
       }
 
-      const targetIdx = idx % results.items.length;
-      results.items[targetIdx].select();
+      const targetIdx = idx % items.length;
+      items[targetIdx].select();
       await context.sync();
 
-      chipNavIndex[name] = (targetIdx + 1) % results.items.length;
+      chipNavIndex[name] = (targetIdx + 1) % items.length;
 
-      if (results.items.length > 1) {
-        showCreateStatus(`{{${name}}} — occurrence ${targetIdx + 1} of ${results.items.length}`, "info");
+      if (items.length > 1) {
+        showCreateStatus(`{{${name}}} — occurrence ${targetIdx + 1} of ${items.length}`, "info");
       } else {
         hideCreateStatus();
       }
