@@ -566,6 +566,9 @@ async function fillDocument() {
           .map((k) => currentFields.find((f) => f.key === k)?.label || k)
           .join(", ");
         showStatus(`✓ Done. Highlighted fields were skipped: ${skipped}`, "info");
+        // Scroll to the first skipped field so the user sees it
+        const firstEmpty = document.querySelector(".field-row.field-empty");
+        if (firstEmpty) firstEmpty.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } else {
         showStatus("✓ All fields filled successfully.", "success");
       }
@@ -657,6 +660,7 @@ function showClearConfirm() {
   `;
   el.className = "info";
   el.style.display = "block";
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 async function confirmReset() {
@@ -874,6 +878,7 @@ function showStatus(msg, type) {
   el.textContent = msg;
   el.className = type;
   el.style.display = "block";
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function hideStatus() {
