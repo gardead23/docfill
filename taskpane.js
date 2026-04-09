@@ -116,28 +116,35 @@ async function searchAllBodies(context, searchText, options) {
 
 /**
  * Deduplicate ranges that point to the same location (e.g., from linked headers).
- * Uses Range.compareLocationWith() to detect overlapping ranges.
+ * Batches all Range.compareLocationWith() calls into a single sync for performance.
  * Must be called inside Word.run.
  */
 async function dedupeRanges(context, ranges) {
   if (ranges.length <= 1) return ranges;
-  const unique = [ranges[0]];
+
+  // Queue all pairwise comparisons in one batch
+  const comparisons = [];
   for (let i = 1; i < ranges.length; i++) {
-    let isDuplicate = false;
-    for (const kept of unique) {
-      const loc = ranges[i].compareLocationWith(kept);
-      await context.sync();
-      if (loc.value === "Equal" || loc.value === "Inside" || loc.value === "Contains" ||
-          loc.value === Word.LocationRelation.equal ||
-          loc.value === Word.LocationRelation.inside ||
-          loc.value === Word.LocationRelation.contains) {
-        isDuplicate = true;
-        break;
-      }
+    for (let j = 0; j < i; j++) {
+      comparisons.push({ i, j, result: ranges[i].compareLocationWith(ranges[j]) });
     }
-    if (!isDuplicate) unique.push(ranges[i]);
   }
-  return unique;
+  await context.sync(); // single sync for all comparisons
+
+  // Mark duplicates
+  const duplicates = new Set();
+  for (const { i, result } of comparisons) {
+    if (duplicates.has(i)) continue;
+    const v = result.value;
+    if (v === "Equal" || v === "Inside" || v === "Contains" ||
+        v === Word.LocationRelation.equal ||
+        v === Word.LocationRelation.inside ||
+        v === Word.LocationRelation.contains) {
+      duplicates.add(i);
+    }
+  }
+
+  return ranges.filter((_, idx) => !duplicates.has(idx));
 }
 
 // ── Office Initialization ──────────────────────────────────────────────────────
@@ -556,19 +563,23 @@ async function fillDocument() {
           // naturally dedupe (placeholder is gone by the second pass)
           const bodies = await getAllBodies(context);
           for (const b of bodies) {
-            const results = b.search(`{{${key}}}`, { matchCase: true });
-            results.load("items");
-            await context.sync();
-            for (const range of results.items) {
-              range.insertText(value, Word.InsertLocation.replace);
-              const cc = range.insertContentControl();
-              cc.tag = key;
-              cc.title = key;
-              cc.appearance = Word.ContentControlAppearance.hidden;
-            }
-            if (results.items.length > 0) {
-              totalReplaced += results.items.length;
+            try {
+              const results = b.search(`{{${key}}}`, { matchCase: true });
+              results.load("items");
               await context.sync();
+              for (const range of results.items) {
+                range.insertText(value, Word.InsertLocation.replace);
+                const cc = range.insertContentControl();
+                cc.tag = key;
+                cc.title = key;
+                cc.appearance = Word.ContentControlAppearance.hidden;
+              }
+              if (results.items.length > 0) {
+                totalReplaced += results.items.length;
+                await context.sync();
+              }
+            } catch {
+              // Linked header/footer already modified — skip silently
             }
           }
         }
