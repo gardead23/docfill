@@ -90,9 +90,17 @@ async function getAllBodies(context) {
   for (const b of hfBodies) b.load("text");
   await context.sync();
 
-  // Only include non-empty header/footer bodies
+  // Only include non-empty header/footer bodies, deduplicated.
+  // Linked headers (Link to Previous) share the same content across sections.
+  // Word.js has no API to detect linking, so we deduplicate by exact text match:
+  // if two bodies have identical text, they're linked and we only process one.
+  const seenTexts = new Set();
   for (const b of hfBodies) {
-    if (b.text && b.text.trim()) bodies.push(b);
+    const t = b.text && b.text.trim();
+    if (t && !seenTexts.has(t)) {
+      seenTexts.add(t);
+      bodies.push(b);
+    }
   }
   return bodies;
 }
@@ -158,10 +166,15 @@ async function scanDocument() {
       }
       await context.sync();
 
-      // Combine body + header/footer text for placeholder detection
+      // Combine body + deduplicated header/footer text for placeholder detection
       let raw = body.text || "";
+      const seenHfTexts = new Set();
       for (const hf of hfBodies) {
-        if (hf.text && hf.text.trim()) raw += " " + hf.text;
+        const t = hf.text && hf.text.trim();
+        if (t && !seenHfTexts.has(t)) {
+          seenHfTexts.add(t);
+          raw += " " + hf.text;
+        }
       }
       const matches = raw.match(/\{\{(\w+)\}\}/g) || [];
       const docKeys = [...new Set(matches)].map((m) => m.replace(/\{\{|\}\}/g, ""));
@@ -779,10 +792,15 @@ async function computeDocumentFingerprint() {
       }
       await context.sync();
 
-      // Combine all text sources
+      // Combine all text sources, deduplicating linked headers/footers
       let raw = body.text || "";
+      const seenFpTexts = new Set();
       for (const hf of hfBodies) {
-        if (hf.text && hf.text.trim()) raw += " " + hf.text;
+        const t = hf.text && hf.text.trim();
+        if (t && !seenFpTexts.has(t)) {
+          seenFpTexts.add(t);
+          raw += " " + hf.text;
+        }
       }
 
       // Remove filled values (content control text) so fingerprint is stable after fill
