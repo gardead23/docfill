@@ -544,6 +544,7 @@ async function fillDocument() {
 
   try {
     let totalReplaced = 0;
+    let regionsSkipped = 0;
 
     await Word.run(async (context) => {
       // Load all bodies once (not per-key)
@@ -582,9 +583,10 @@ async function fillDocument() {
               totalReplaced += results.items.length;
               await context.sync();
             } catch (bodyErr) {
-              // Linked headers throw GeneralException when their content was
-              // already modified via the linked copy. Log other errors.
-              if (bodyErr.code !== "GeneralException") {
+              if (bodyErr.code === "GeneralException") {
+                // Linked header already modified via linked copy — expected, skip
+              } else {
+                regionsSkipped++;
                 console.warn(`DocFill: skipped a region for {{${key}}}:`, bodyErr.message || bodyErr);
               }
             }
@@ -603,16 +605,21 @@ async function fillDocument() {
         const resetBtn = document.getElementById(`reset-btn-${key}`);
         if (resetBtn) resetBtn.style.display = "inline-flex";
       }
-      if (emptyKeys.length > 0) {
+      if (regionsSkipped > 0) {
+        showStatus(
+          `Filled with errors: ${regionsSkipped} region${regionsSkipped > 1 ? "s were" : " was"} skipped. Some placeholders may not have been replaced.`,
+          "error"
+        );
+      } else if (emptyKeys.length > 0) {
         const skipped = emptyKeys
           .map((k) => currentFields.find((f) => f.key === k)?.label || k)
           .join(", ");
-        showStatus(`✓ Done. Highlighted fields were skipped: ${skipped}`, "info");
+        showStatus(`Done. Highlighted fields were skipped: ${skipped}`, "info");
         // Scroll to the first skipped field so the user sees it
         const firstEmpty = document.querySelector(".field-row.field-empty");
         if (firstEmpty) firstEmpty.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } else {
-        showStatus("✓ All fields filled successfully.", "success");
+        showStatus("All fields filled successfully.", "success");
       }
     }
   } catch (err) {
