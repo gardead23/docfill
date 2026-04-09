@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DocFill - Privacy Policy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 15px;
+      color: #111827;
+      background: #f3f4f6;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+    header {
+      background: #0f172a;
+      padding: 24px 32px;
+    }
+    header h1 {
+      color: white;
+      font-size: 20px;
+      font-weight: 600;
+    }
+    header p {
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    main {
+      max-width: 680px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 28px 0 8px;
+    }
+    h2:first-child { margin-top: 0; }
+    p, ul { margin-bottom: 12px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 28px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .updated {
+      text-align: center;
+      color: #6b7280;
+      font-size: 12px;
+      margin-top: 24px;
+      padding-bottom: 32px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DocFill - Privacy Policy</h1>
+    <p>How DocFill handles your data</p>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Overview</h2>
+      <p>DocFill is a Microsoft Word add-in that helps you fill placeholder fields in document templates. Your privacy is important to us. This policy explains what data DocFill accesses and how it is handled.</p>
+
+      <h2>Data Processing</h2>
+      <p>DocFill processes your document content entirely within your browser. Specifically:</p>
+      <ul>
+        <li>DocFill scans your Word document for <code>{{placeholder}}</code> markers to build a fill form.</li>
+        <li>When you click "Fill Document," DocFill replaces placeholders with the values you entered.</li>
+        <li>A snapshot of your document is stored temporarily in browser memory to support the "Restore Original Document" feature. This snapshot is discarded when you close the task pane.</li>
+      </ul>
+
+      <h2>Data Storage</h2>
+      <p>DocFill stores your field configuration (labels, field types, date format preferences) in your browser's localStorage. This data:</p>
+      <ul>
+        <li>Never leaves your device</li>
+        <li>Is not sent to any server</li>
+        <li>Is not shared with any third party</li>
+        <li>Can be cleared at any time by clearing your browser data</li>
+      </ul>
+
+      <h2>Data Collection</h2>
+      <p>DocFill does not collect, transmit, or store any personal information. We do not use analytics, tracking, cookies, or telemetry of any kind.</p>
+
+      <h2>Document Content Stays Local</h2>
+      <p>Your document content is never transmitted to our servers. The add-in code is loaded from our hosting provider (Cloudflare Pages), and the Office.js library is loaded from Microsoft's CDN, but all document processing happens entirely within your browser. No document text, placeholder values, or filled content is ever sent anywhere.</p>
+
+      <h2>Third Parties</h2>
+      <p>DocFill does not share any data with third parties. The only external resource loaded is the Microsoft Office.js library (from Microsoft's CDN, required for all Office add-ins).</p>
+
+      <h2>Changes to This Policy</h2>
+      <p>If we make changes to this privacy policy, we will update this page. If we introduce features that change how data is handled (such as server-side processing), we will update this policy before those features are released.</p>
+
+      <h2>Contact</h2>
+      <p>If you have questions about this privacy policy, please reach out via our <a href="https://docfill.smplhq.com/support.html">support page</a>.</p>
+    </div>
+  </main>
+  <p class="updated">Last updated: April 9, 2026</p>
+</body>
+</html>

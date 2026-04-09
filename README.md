@@ -11,7 +11,7 @@ A Microsoft Word task pane add-in for creating and filling document templates. B
 
 ### Filling a template
 
-1. Add `{{placeholder_name}}` markers anywhere in your Word document
+1. Add `{{placeholder_name}}` markers to the body of your Word document
 2. Open the DocFill task pane (Home ribbon → **DocFill** button)
 3. Go to the **Fill** tab and click **Scan Document** — the add-in detects all placeholders
 4. Customize labels and field types (Text, Date, Long text) if needed
@@ -112,9 +112,13 @@ docfill/
 ├── taskpane.css      ← styles
 ├── taskpane.js       ← all add-in logic (scan, fill, reset, create, localStorage)
 ├── commands.html     ← required Office command surface shell
-├── icon-16.png       ← ribbon icons
+├── privacy.html      ← privacy policy (required for AppSource)
+├── support.html      ← support/help page (required for AppSource)
+├── icon-16.png       ← ribbon icons (16, 32, 64, 80, 128px)
 ├── icon-32.png
+├── icon-64.png
 ├── icon-80.png
+├── icon-128.png
 ├── CLAUDE.md         ← architectural notes and dev conventions
 └── README.md
 ```
@@ -137,14 +141,15 @@ Then update `<SourceLocation>` in `manifest.xml` to `http://localhost:3000/taskp
 ## Tips
 
 - **Create tab:** Select text in your doc, give it a name, and DocFill replaces it with a `{{placeholder}}` — builds your template without typing brackets manually
-- **Multiple occurrences:** When you replace text that appears more than once, you can replace just the first instance or all of them at once
+- **Multiple occurrences:** When you replace text that appears more than once, you can replace just the first occurrence or all of them at once
 - **Navigate placeholders:** In Create mode, click any chip in "Created so far" to highlight that placeholder in the document; click again to cycle through multiple occurrences
 - **Re-fill:** Change a value and click Fill Document again — it updates the document without needing to clear first
 - **Per-field undo:** Click the ↺ icon on any filled field to restore just that placeholder
-- **Full reset:** Click **Clear all fields** → **Reset Document** to restore the original template (including any text you added around placeholders after scanning)
+- **Full reset:** Click **Restore Original Document** to revert the entire document to its pre-fill state. **Note:** this also removes any edits you made after filling
 - **Rescan:** Click **↺ Rescan** to pick up any new placeholders added to the document
 - **Labels are saved** per template shape — your customizations persist across sessions
 - **Duplicate values blocked:** If two fields have the same value, Fill Document will stop and tell you which fields conflict
+- **Document body only:** DocFill scans and fills placeholders in the document body. Headers, footers, and other special regions are not currently supported
 
 ---
 

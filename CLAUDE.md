@@ -12,6 +12,8 @@ Microsoft Word task pane add-in. Pure static files, no build step. Hosted on Clo
 - `taskpane.css` — styles
 - `manifest.xml` — Office add-in descriptor pointing to Cloudflare Pages URL
 - `commands.html` — required empty shell for Office command surface
+- `privacy.html` — privacy policy (required for AppSource submission)
+- `support.html` — support/help page (required for AppSource submission)
 
 ## UI Structure
 
@@ -89,7 +91,7 @@ Uses `Range.select()` (WordApi 1.1).
 
 ### Multi-occurrence replacement confirmation
 When `createPlaceholder()` finds more than one occurrence, it stores `pendingCreateText` / `pendingCreateName` and renders an inline confirmation with three options:
-- **This word only** — replaces `results.items[0]` only
+- **First occurrence only** — replaces `results.items[0]` (the first match in document order)
 - **All N occurrences** — replaces all items
 - **Cancel** — clears pending state
 
@@ -101,7 +103,9 @@ When `createPlaceholder()` finds more than one occurrence, it stores `pendingCre
 ### Field types and date formatting
 Three field types: `text` (default), `date` (month/day/year dropdowns + format selector), `paragraph` (textarea). Auto-detected from placeholder key name via `guessFieldType()`. Type pills are always visible on each field card (no toggle/expand needed).
 
-Date input uses three `<select>` dropdowns (Month, Day, Year) plus a "Today" button inside a `.date-dropdowns` container. The container div gets `id="val-${field.key}"` so `collectValues()` can read the selected values. Year range is current year ± 5 years (21 options), defaulting to the current year. The "Today" button calls `setDateToday(key)` to populate all three dropdowns with the current date. Format selector is wrapped in a `.date-format-row` with a "Format:" label.
+Date input uses three `<select>` dropdowns (Month, Day, Year) plus a "Today" button inside a `.date-dropdowns` container. The container div gets `id="val-${field.key}"` so `collectValues()` can read the selected values. Year range is current year +/- 5 years (21 options), defaulting to the current year. The "Today" button calls `setDateToday(key)` to populate all three dropdowns with the current date. Format selector is wrapped in a `.date-format-row` with a "Format:" label.
+
+**Date validation:** Day options are dynamically constrained by the selected month and year via `updateDayOptions(key)`. Changing month or year triggers `onchange` which rebuilds the day `<option>` list using `daysInMonth(month, year)` (handles leap years). If the previously selected day exceeds the new max, it clamps to the last valid day. `collectValues()` also applies a safety clamp via `daysInMonth()` before formatting.
 
 Date format system:
 - **Global default** stored in `localStorage` under `docfill:dateFormat` (default: `"long"`)
@@ -125,9 +129,10 @@ Field labels, types, and per-field date formats are saved keyed by the sorted+jo
 
 ## Icons
 
-Source file: `DocFill Icon.png` (1080×1080, RGBA, transparent background).
+Source file: `DocFill Icon.png` (1080x1080, RGBA, transparent background).
+Generated sizes: 16, 32, 64, 80, 128px. The 64px and 128px sizes are required by AppSource (`<IconUrl>` and `<HighResolutionIconUrl>`).
 
-To regenerate `icon-16.png`, `icon-32.png`, `icon-80.png` from the source:
+To regenerate all icons from the source:
 
 ```bash
 python3 << 'EOF'
@@ -141,7 +146,7 @@ size = max(w, h)
 square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
 square.paste(img, ((size - w) // 2, (size - h) // 2), img)
 
-for out_size, name in [(16, "icon-16.png"), (32, "icon-32.png"), (80, "icon-80.png")]:
+for out_size, name in [(16, "icon-16.png"), (32, "icon-32.png"), (64, "icon-64.png"), (80, "icon-80.png"), (128, "icon-128.png")]:
     square.resize((out_size, out_size), Image.LANCZOS).save(name)
     print(f"Saved {name}")
 EOF
@@ -153,6 +158,13 @@ Requires Pillow (`pip3 install Pillow`).
 
 Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys automatically to https://docfill.smplhq.com — no manual deploy step needed.
 
+## Known Limitations
+
+- **Document body only:** All scan/fill/create operations use `context.document.body`. Headers, footers, text boxes, and other story ranges are not scanned or filled. Documented in README and support page.
+- **Restore is full-document rollback:** "Restore Original Document" replaces the entire document body with the pre-fill OOXML snapshot. Any edits made after filling (even unrelated prose) are lost. The confirmation dialog warns about this explicitly.
+- **Text-search-based refill/reset:** Re-fill and per-field reset work by searching the document body for the previously filled value. If the same text appears elsewhere naturally, it could be incorrectly replaced. The duplicate-value guard mitigates the worst case. A future improvement would use content controls or bookmarks as stable anchors.
+- **"First occurrence only" in Create mode:** When multiple occurrences exist, this option replaces `results.items[0]` (first in document order), not necessarily the user's selected instance. The button label makes this explicit.
+
 ## Office.js Gotchas
 
 - `body.search()` is case-sensitive when `matchCase: true` — use consistently
@@ -162,6 +174,34 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 - `Range.select()` scrolls to and highlights a range in the document (WordApi 1.1)
 - `window.confirm()` is silently blocked in Office add-in webviews — never use it
 - Minimum API requirement: `WordApi 1.3` (set in manifest `<Requirements>`)
+
+## Fonts
+
+Uses system font stack: `"Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif`. No external font dependencies. Google Fonts was removed to eliminate a third-party dependency (security hardening for AppSource).
+
+## AppSource Submission
+
+**Status:** In progress. Preparing for Microsoft AppSource (Office Add-in Store) listing.
+
+### Completed
+- Privacy policy page (`privacy.html`) — describes local-only data handling
+- Support page (`support.html`) — quick start guide, FAQ, contact email (support@smplhq.com)
+- Manifest updated: `<PrivacyUrl>`, `<SupportUrl>`, `<LongDescription>`, correct icon sizes (64/128)
+- Icon sizes generated: 16, 32, 64, 80, 128px
+
+### Remaining Before Submission
+- [ ] Create Microsoft Partner Center account ($19 individual / $99 company)
+- [ ] Complete identity verification and tax/payout profile
+- [ ] Take screenshots (1366x768 recommended) showing scan, fill, and create workflows
+- [ ] Write testing instructions for Microsoft reviewer
+- [ ] Validate manifest: `npx office-addin-manifest validate manifest.xml`
+- [ ] Test add-in in Word for the web (reviewers often test there first)
+- [ ] Submit via Partner Center > Marketplace offers > Office Add-ins
+
+### Distribution Strategy
+- **AppSource** for public discovery and free install
+- **smplhq.com** for licensing/billing — add-in checks license against SMPL HQ backend
+- Direct sideload option available for enterprise users via manifest URL
 
 ## Future: AI Phase
 

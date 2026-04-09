@@ -106,10 +106,14 @@ async function scanDocument() {
       const keys = [...orderedExisting, ...brandNewKeys];
 
       if (keys.length === 0) {
-        showStatus(
-          "No {{placeholders}} found. Add fields like {{client_name}} to your document and rescan.",
-          "error"
-        );
+        // Clear stale form state and show empty state with guidance
+        currentFields = [];
+        currentStorageKey = "";
+        document.getElementById("fields-section").style.display = "none";
+        document.getElementById("actions").style.display = "none";
+        document.getElementById("empty-state").style.display = "block";
+        document.querySelector(".empty-desc").innerHTML =
+          'No <code>{{placeholders}}</code> found. Add fields like <code>{{client_name}}</code> to your document, then scan again.';
         setScanButtonLoading(false);
         return;
       }
@@ -257,9 +261,9 @@ function buildValueInput(field) {
       return `<option value="${y}">${y}</option>`;
     }).join("");
     return `<div class="date-dropdowns" id="${id}">
-      <select class="date-select date-month" title="Month"><option value="">Month</option>${monthOpts}</select>
+      <select class="date-select date-month" title="Month" onchange="updateDayOptions('${escapeAttr(field.key)}')"><option value="">Month</option>${monthOpts}</select>
       <select class="date-select date-day" title="Day"><option value="">Day</option>${dayOpts}</select>
-      <select class="date-select date-year" title="Year"><option value="" selected>Year</option>${yearOpts}</select>
+      <select class="date-select date-year" title="Year" onchange="updateDayOptions('${escapeAttr(field.key)}')" ><option value="" selected>Year</option>${yearOpts}</select>
       <button type="button" class="date-today-btn" onclick="setDateToday('${escapeAttr(field.key)}')" title="Set to today">Today</button>
     </div>
     <div class="date-format-row">
@@ -316,8 +320,41 @@ function setDateToday(key) {
   if (!container) return;
   const now = new Date();
   container.querySelector(".date-month").value = now.getMonth() + 1;
-  container.querySelector(".date-day").value = now.getDate();
   container.querySelector(".date-year").value = now.getFullYear();
+  updateDayOptions(key);
+  container.querySelector(".date-day").value = now.getDate();
+}
+
+/** Return how many days a given month/year has (handles leap years). */
+function daysInMonth(month, year) {
+  if (!month) return 31;
+  if (!year) year = new Date().getFullYear();
+  return new Date(year, month, 0).getDate();
+}
+
+/** Re-build day <option>s for a date field based on the selected month/year. */
+function updateDayOptions(key) {
+  const container = document.getElementById(`val-${key}`);
+  if (!container) return;
+  const monthSel = container.querySelector(".date-month");
+  const daySel = container.querySelector(".date-day");
+  const yearSel = container.querySelector(".date-year");
+  const month = parseInt(monthSel.value, 10) || 0;
+  const year = parseInt(yearSel.value, 10) || 0;
+  const maxDay = daysInMonth(month, year);
+  const currentDay = parseInt(daySel.value, 10) || 0;
+
+  // Rebuild options
+  let html = '<option value="">Day</option>';
+  for (let d = 1; d <= maxDay; d++) {
+    html += `<option value="${d}">${d}</option>`;
+  }
+  daySel.innerHTML = html;
+
+  // Preserve selection, clamping if needed
+  if (currentDay > 0) {
+    daySel.value = currentDay > maxDay ? maxDay : currentDay;
+  }
 }
 
 function setFieldDateFormat(key, format) {
@@ -469,8 +506,13 @@ function collectValues() {
         const d = container.querySelector(".date-day")?.value;
         const y = container.querySelector(".date-year")?.value;
         if (m && d && y) {
+          const mi = parseInt(m, 10);
+          const di = parseInt(d, 10);
+          const yi = parseInt(y, 10);
+          const maxDay = daysInMonth(mi, yi);
           const pad = (n) => String(n).padStart(2, "0");
-          const isoDate = `${y}-${pad(m)}-${pad(d)}`;
+          const safeDay = di > maxDay ? maxDay : di;
+          const isoDate = `${yi}-${pad(mi)}-${pad(safeDay)}`;
           const fmt = field.dateFormat || globalFmt;
           values[field.key] = formatDate(isoDate, fmt);
         } else {
@@ -523,9 +565,10 @@ async function clearForm() {
 function showClearConfirm() {
   const el = document.getElementById("status");
   el.innerHTML = `
-    <div style="margin-bottom:10px">Reset the document to its original template?</div>
+    <div style="margin-bottom:6px;font-weight:600">Restore original document?</div>
+    <div style="margin-bottom:10px;font-size:12px;color:#64748b">This will undo all filled values and any edits you made after filling. The document will be restored to its pre-fill state.</div>
     <div style="display:flex;gap:8px">
-      <button onclick="confirmReset()" style="flex:1;padding:7px 0;background:#2563eb;color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Reset Document</button>
+      <button onclick="confirmReset()" style="flex:1;padding:7px 0;background:#dc2626;color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Restore Original</button>
       <button onclick="hideStatus()" style="padding:7px 12px;background:none;border:1.5px solid #bfdbfe;border-radius:7px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
     </div>
   `;
@@ -546,11 +589,11 @@ async function confirmReset() {
     hasFilled = false;
   } catch (err) {
     showStatus("Failed to reset document: " + err.message, "error");
-    if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Clear all fields"; }
+    if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Restore Original Document"; }
     return;
   }
 
-  if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Clear all fields"; }
+  if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Restore Original Document"; }
   doFormClear();
 }
 
@@ -577,7 +620,15 @@ async function resetField(key) {
     if (found) {
       delete lastFilledValues[key];
       const input = document.getElementById(`val-${key}`);
-      if (input) input.value = "";
+      if (input) {
+        // Check if this is a date field (container with date-select children)
+        const dateSelects = input.querySelectorAll?.(".date-select");
+        if (dateSelects && dateSelects.length > 0) {
+          dateSelects.forEach((sel) => { sel.value = ""; });
+        } else {
+          input.value = "";
+        }
+      }
       if (resetBtn) { resetBtn.style.display = "none"; resetBtn.disabled = false; }
       if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
     } else {
@@ -593,6 +644,10 @@ async function resetField(key) {
 function doFormClear() {
   document.querySelectorAll(".field-value-input, .field-value-textarea").forEach((el) => {
     el.value = "";
+  });
+  // Clear date dropdowns back to placeholder
+  document.querySelectorAll(".date-dropdowns").forEach((container) => {
+    container.querySelectorAll(".date-select").forEach((sel) => { sel.value = ""; });
   });
   document.querySelectorAll(".field-row.field-empty").forEach((r) => r.classList.remove("field-empty"));
   document.querySelectorAll(".field-reset-btn").forEach((btn) => { btn.style.display = "none"; });
@@ -676,6 +731,7 @@ function switchTab(tab) {
 
   if (tab === "create") {
     document.getElementById("actions").style.display = "none";
+    fetchCurrentSelection();
   } else if (tab === "fill" && currentFields.length > 0) {
     document.getElementById("actions").style.display = "flex";
   }
@@ -813,7 +869,7 @@ function showReplaceAllConfirm(count, name) {
   el.innerHTML = `
     <div style="margin-bottom:8px">Found <strong>${count} occurrences</strong> of this text. Replace with <code>{{${escapeHtml(name)}}}</code>?</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button onclick="confirmReplace(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">This word only</button>
+      <button onclick="confirmReplace(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">First occurrence only</button>
       <button onclick="confirmReplace(true)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">All ${count} occurrences</button>
       <button onclick="hideCreateStatus()" style="padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
     </div>

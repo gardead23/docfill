@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DocFill - Support</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 15px;
+      color: #111827;
+      background: #f3f4f6;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+    header {
+      background: #0f172a;
+      padding: 24px 32px;
+    }
+    header h1 {
+      color: white;
+      font-size: 20px;
+      font-weight: 600;
+    }
+    header p {
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    main {
+      max-width: 680px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 28px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 12px;
+    }
+    p { margin-bottom: 12px; }
+    .help-section { margin-bottom: 24px; }
+    .help-section:last-child { margin-bottom: 0; }
+    .help-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    .help-section p { color: #4b5563; font-size: 14px; }
+    .contact-card {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+    }
+    a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+    code {
+      background: #f3f4f6;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DocFill - Support</h1>
+    <p>Get help with DocFill</p>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Quick Start</h2>
+      <div class="help-section">
+        <h3>Creating a Template</h3>
+        <p>Select text in your Word document, switch to the <strong>Create</strong> tab, and click "Replace with Placeholder" to turn it into a <code>{{placeholder}}</code> field. Do this for each field you want to make fillable.</p>
+      </div>
+      <div class="help-section">
+        <h3>Filling a Template</h3>
+        <p>Open a document with <code>{{placeholder}}</code> markers, switch to the <strong>Fill</strong> tab, and click "Scan Document." Fill in the form and click "Fill Document" to replace all placeholders with your values.</p>
+      </div>
+      <div class="help-section">
+        <h3>Resetting</h3>
+        <p>Click "Restore Original Document" to revert the document to its pre-fill state. Note: this also removes any edits you made after filling.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Common Questions</h2>
+      <div class="help-section">
+        <h3>My placeholders aren't being detected</h3>
+        <p>Make sure placeholders use double curly braces: <code>{{name}}</code>. The text inside must be a single word or use underscores (e.g., <code>{{first_name}}</code>). Avoid spaces inside the braces.</p>
+      </div>
+      <div class="help-section">
+        <h3>Can I re-fill without resetting?</h3>
+        <p>Yes. Just change the values in the form and click "Fill Document" again. DocFill will swap the old values back to placeholders and fill with the new values automatically.</p>
+      </div>
+      <div class="help-section">
+        <h3>Where is my data stored?</h3>
+        <p>Your field settings (labels, types, date formats) are saved in your browser's local storage. No data is sent to any server. See our <a href="https://docfill.smplhq.com/privacy.html">privacy policy</a> for details.</p>
+      </div>
+    </div>
+
+    <div class="card contact-card">
+      <h2>Contact Us</h2>
+      <p>Need help with something not covered above? Reach out to us:</p>
+      <p><strong>Email:</strong> <a href="mailto:support@smplhq.com">support@smplhq.com</a></p>
+      <p>We aim to respond within 1-2 business days.</p>
+    </div>
+  </main>
+</body>
+</html>
