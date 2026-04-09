@@ -51,10 +51,13 @@ let lastSuggestedName = "";
 let createdPlaceholders = [];
 let pendingCreateText = "";
 let pendingCreateName = "";
+let pendingCreateIndex = -1;
 /** @type {Record<string, number>} tracks which occurrence to navigate to next per placeholder */
 const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
+/** Index of the selected occurrence among all matches (for "This occurrence" targeting). -1 = unknown. */
+let lastSelectedOccurrenceIndex = -1;
 
 // ── Office Initialization ──────────────────────────────────────────────────────
 
@@ -78,16 +81,31 @@ async function scanDocument() {
       const body = context.document.body;
       const ooxmlResult = body.getOoxml();
       body.load("text");
+      // Also load content controls to detect filled fields
+      const allCCs = context.document.contentControls;
+      allCCs.load("items,tag,text");
       await context.sync();
 
       const raw = body.text || "";
       const matches = raw.match(/\{\{(\w+)\}\}/g) || [];
       const docKeys = [...new Set(matches)].map((m) => m.replace(/\{\{|\}\}/g, ""));
 
+      // Build a map of currently filled fields from content controls
+      const ccFilledKeys = new Set();
+      for (const cc of allCCs.items) {
+        if (cc.tag) ccFilledKeys.add(cc.tag);
+      }
+
       // Sync state with doc: if a key appears as a {{placeholder}} it wasn't filled
-      // (or was undone via Ctrl+Z). Remove it from tracking so Phase 1 won't mis-restore.
+      // (or was undone via Ctrl+Z, which also removes the content control).
       for (const key of docKeys) {
         delete lastFilledValues[key];
+      }
+      // Also remove any keys that no longer have content controls
+      for (const key of Object.keys(lastFilledValues)) {
+        if (!ccFilledKeys.has(key)) {
+          delete lastFilledValues[key];
+        }
       }
       if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
 
@@ -401,28 +419,6 @@ async function fillDocument() {
     document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
   });
 
-  // Block fill if any two fields share the same value (breaks two-phase re-fill)
-  const valueToKeys = {};
-  for (const [k, v] of Object.entries(toFill)) {
-    if (!valueToKeys[v]) valueToKeys[v] = [];
-    valueToKeys[v].push(k);
-  }
-  const duplicateGroups = Object.values(valueToKeys).filter((ks) => ks.length > 1);
-  if (duplicateGroups.length > 0) {
-    const desc = duplicateGroups.map((ks) => {
-      const labels = ks.map((k) => currentFields.find((f) => f.key === k)?.label || k);
-      return labels.join(" and ");
-    }).join("; ");
-    showStatus(
-      `Two fields can't have the same value (${desc}). Use a single placeholder for repeated text, or enter different values.`,
-      "error"
-    );
-    duplicateGroups.flat().forEach((key) => {
-      document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
-    });
-    return;
-  }
-
   // Re-capture OOXML right before the first fill so it includes any text
   // the user added to the document after the last scan
   if (Object.keys(lastFilledValues).length === 0) {
@@ -443,30 +439,34 @@ async function fillDocument() {
     let totalReplaced = 0;
 
     await Word.run(async (context) => {
-      // Phase 1: restore any previously filled values back to {{placeholders}}
-      const keysToRestore = Object.keys(toFill).filter((k) => lastFilledValues[k]);
-      if (keysToRestore.length > 0) {
-        const restoreSearches = {};
-        for (const key of keysToRestore) {
-          restoreSearches[key] = context.document.body.search(lastFilledValues[key], { matchCase: true });
-          restoreSearches[key].load("items");
-        }
-        await context.sync();
-        for (const [key, results] of Object.entries(restoreSearches)) {
-          results.items.forEach((item) => item.insertText(`{{${key}}}`, Word.InsertLocation.replace));
-        }
-        await context.sync();
-      }
-
-      // Phase 2: fill placeholders with new values
       for (const [key, value] of Object.entries(toFill)) {
-        const results = context.document.body.search(`{{${key}}}`, { matchCase: true });
-        results.load("items");
+        // Check if content controls already exist for this field (refill case)
+        const existing = context.document.contentControls.getByTag(key);
+        existing.load("items");
         await context.sync();
-        totalReplaced += results.items.length;
-        results.items.forEach((item) => item.insertText(value, Word.InsertLocation.replace));
+
+        if (existing.items.length > 0) {
+          // Refill: update text inside existing content controls
+          for (const cc of existing.items) {
+            cc.insertText(value, Word.InsertLocation.replace);
+          }
+          totalReplaced += existing.items.length;
+        } else {
+          // First fill: search for raw placeholder text, replace, and wrap
+          const results = context.document.body.search(`{{${key}}}`, { matchCase: true });
+          results.load("items");
+          await context.sync();
+          totalReplaced += results.items.length;
+          for (const range of results.items) {
+            range.insertText(value, Word.InsertLocation.replace);
+            const cc = range.insertContentControl();
+            cc.tag = key;
+            cc.title = key;
+            cc.appearance = Word.ContentControlAppearance.hidden;
+          }
+        }
+        await context.sync();
       }
-      await context.sync();
     });
 
     if (totalReplaced === 0) {
@@ -607,12 +607,17 @@ async function resetField(key) {
   try {
     let found = false;
     await Word.run(async (context) => {
-      const results = context.document.body.search(filledValue, { matchCase: true });
-      results.load("items");
+      // Find content controls tagged with this placeholder key
+      const ccs = context.document.contentControls.getByTag(key);
+      ccs.load("items");
       await context.sync();
-      if (results.items.length > 0) {
+
+      if (ccs.items.length > 0) {
         found = true;
-        results.items.forEach((item) => item.insertText(`{{${key}}}`, Word.InsertLocation.replace));
+        for (const cc of ccs.items) {
+          cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
+          cc.delete(false); // unwrap, leaving the placeholder text
+        }
         await context.sync();
       }
     });
@@ -633,7 +638,7 @@ async function resetField(key) {
       if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
     } else {
       if (resetBtn) resetBtn.disabled = false;
-      showStatus("Could not find this field's value in the document — it may have been edited directly.", "error");
+      showStatus("Could not find this field in the document — it may have been edited directly.", "error");
     }
   } catch (err) {
     if (resetBtn) resetBtn.disabled = false;
@@ -756,6 +761,30 @@ async function fetchCurrentSelection() {
       const text = sel.text.trim();
       // Ignore multi-paragraph selections (Word returns \r between paragraphs)
       lastSelectedText = text.includes("\r") || text.includes("\n") ? "" : text;
+      lastSelectedOccurrenceIndex = -1;
+
+      // If text exists and might have multiple occurrences, find which one is selected
+      if (lastSelectedText && lastSelectedText.length > 0) {
+        const results = context.document.body.search(lastSelectedText, { matchCase: true });
+        results.load("items");
+        await context.sync();
+
+        if (results.items.length > 1) {
+          // Compare each result with the selection to find the matching one
+          for (let i = 0; i < results.items.length; i++) {
+            const loc = sel.compareLocationWith(results.items[i]);
+            await context.sync();
+            if (loc.value === Word.LocationRelation.equal ||
+                loc.value === Word.LocationRelation.contains ||
+                loc.value === Word.LocationRelation.inside ||
+                loc.value === "Equal" || loc.value === "Contains" || loc.value === "Inside") {
+              lastSelectedOccurrenceIndex = i;
+              break;
+            }
+          }
+        }
+      }
+
       updateSelectionPreview(lastSelectedText);
     });
   } catch {
@@ -843,7 +872,8 @@ async function createPlaceholder() {
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
-        showReplaceAllConfirm(occurrenceCount, name);
+        pendingCreateIndex = lastSelectedOccurrenceIndex;
+        showReplaceAllConfirm(occurrenceCount, name, lastSelectedOccurrenceIndex);
         return;
       }
 
@@ -864,12 +894,15 @@ async function createPlaceholder() {
   btn.innerHTML = "Replace with Placeholder";
 }
 
-function showReplaceAllConfirm(count, name) {
+function showReplaceAllConfirm(count, name, selectedIndex) {
   const el = document.getElementById("create-status");
+  const singleLabel = selectedIndex >= 0
+    ? `This occurrence (#${selectedIndex + 1})`
+    : "First occurrence only";
   el.innerHTML = `
     <div style="margin-bottom:8px">Found <strong>${count} occurrences</strong> of this text. Replace with <code>{{${escapeHtml(name)}}}</code>?</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button onclick="confirmReplace(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">First occurrence only</button>
+      <button onclick="confirmReplace(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">${singleLabel}</button>
       <button onclick="confirmReplace(true)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">All ${count} occurrences</button>
       <button onclick="hideCreateStatus()" style="padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
     </div>
@@ -883,8 +916,10 @@ async function confirmReplace(replaceAll) {
 
   const text = pendingCreateText;
   const name = pendingCreateName;
+  const targetIndex = pendingCreateIndex;
   pendingCreateText = "";
   pendingCreateName = "";
+  pendingCreateIndex = -1;
   if (!text || !name) return;
 
   const btn = document.getElementById("create-replace-btn");
@@ -902,8 +937,10 @@ async function confirmReplace(replaceAll) {
         count = results.items.length;
         results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
       } else {
+        // Use the stored occurrence index if available, otherwise fall back to first
+        const idx = (targetIndex >= 0 && targetIndex < results.items.length) ? targetIndex : 0;
         count = 1;
-        results.items[0].insertText(`{{${name}}}`, Word.InsertLocation.replace);
+        results.items[idx].insertText(`{{${name}}}`, Word.InsertLocation.replace);
       }
       await context.sync();
     });

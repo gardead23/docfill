@@ -62,14 +62,17 @@ Five top-level state variables:
 - Used by `confirmReset()` to restore the full document via `body.insertOoxml(..., Word.InsertLocation.replace)`
 - Stays in JS memory only; never sent to any server; clears when task pane closes
 
-### Two-phase fill (re-fill without clearing)
-`fillDocument()` uses a two-phase approach to support updating already-filled fields:
-1. **Phase 1 (restore):** For each key in `toFill` that has a `lastFilledValues` entry, search the doc for the old value and replace it back with `{{key}}`
-2. **Phase 2 (fill):** Search for `{{key}}` and replace with the new value
+### Content controls for fill tracking
+When `fillDocument()` replaces a `{{placeholder}}` with a value, it wraps the inserted text in a hidden content control (`appearance: "hidden"`) tagged with the placeholder key (`cc.tag = key`). This provides stable document anchors for refill and reset operations.
 
-This avoids "placeholder already consumed" errors when re-filling without a full document reset.
+**First fill:** Search for `{{key}}` text, replace with value, wrap in tagged content control.
+**Refill:** Find content controls by tag (`contentControls.getByTag(key)`), replace their text directly. No text-search needed.
+**Per-field reset:** Find content control by tag, replace text with `{{key}}`, unwrap control (`cc.delete(false)`).
+**Full document reset:** Still uses the OOXML snapshot approach (replaces entire body).
 
-**Duplicate value guard:** Before running either phase, `fillDocument()` checks if any two filled fields share the same value. If so, fill is blocked entirely with an error naming the conflicting fields. Same values would cause Phase 1 to confuse which occurrence to restore, producing incorrect output.
+Content controls persist across save/reopen (they are native Word OOXML elements: `<w:sdt>`). Tags are not unique -- multiple occurrences of the same placeholder share the same tag, and `getByTag()` returns all of them.
+
+`lastFilledValues` is still maintained for UI state (form values, reset button visibility) but is no longer used for document-level text searching.
 
 ### Selection monitoring in Create mode
 - `DocumentSelectionChanged` event fires on every cursor move — always registered, but handler returns immediately if `activeTab !== 'create'`
@@ -77,6 +80,7 @@ This avoids "placeholder already consumed" errors when re-filling without a full
 - `fetchCurrentSelection()` guards against overlapping calls with `selectionFetchInProgress` flag
 - Multi-paragraph selections (Word returns `\r` between paragraphs) are discarded — only single-line selections are usable as placeholder text
 - **Selection loss problem:** Clicking task pane buttons loses the document selection. Solved by storing `lastSelectedText` from the debounced event; the button handler uses the stored value, not the live selection
+- **Occurrence targeting:** When the selected text appears multiple times, `fetchCurrentSelection()` uses `Range.compareLocationWith()` (WordApi 1.3) to determine which occurrence index the selection corresponds to, stored as `lastSelectedOccurrenceIndex`. This allows "This occurrence (#N)" to replace the correct instance instead of always targeting `items[0]`. Falls back to first occurrence if the index cannot be determined.
 
 ### Range proxy lifetime
 Word Range objects only live within their `Word.run` context — they cannot be persisted across calls. The create flow stores selected text as a string and uses `body.search()` at replacement time to find and replace all matching ranges.
@@ -122,7 +126,7 @@ After a fill, rescanning finds fewer placeholders (consumed ones are gone). To p
 2. Reconstruct order using `orderedExisting` (filter `currentFields` against the merged set) + `brandNewKeys` (truly new keys appended at the end)
 
 ### Ctrl+Z state sync
-When `scanDocument()` runs, for any key that appears as `{{placeholder}}` in the document, that key is deleted from `lastFilledValues`. This handles cases where the user undid a fill via Ctrl+Z, keeping DocFill's state consistent with the document.
+When `scanDocument()` runs, it checks both raw `{{placeholder}}` text in the document body and the presence of content controls. For any key that appears as `{{placeholder}}` text, that key is deleted from `lastFilledValues` (the fill was undone). Additionally, any key in `lastFilledValues` that no longer has a corresponding content control is also removed. This handles cases where the user undid a fill via Ctrl+Z (which removes both the text change and the content control), keeping DocFill's state consistent with the document.
 
 ### localStorage persistence
 Field labels, types, and per-field date formats are saved keyed by the sorted+joined set of placeholder keys. Same template shape → same configs on next open. Prefix: `template-filler:` (kept as-is to avoid breaking existing data). Global date format stored separately under `docfill:dateFormat`.
@@ -162,8 +166,7 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 
 - **Document body only:** All scan/fill/create operations use `context.document.body`. Headers, footers, text boxes, and other story ranges are not scanned or filled. Documented in README and support page.
 - **Restore is full-document rollback:** "Restore Original Document" replaces the entire document body with the pre-fill OOXML snapshot. Any edits made after filling (even unrelated prose) are lost. The confirmation dialog warns about this explicitly.
-- **Text-search-based refill/reset:** Re-fill and per-field reset work by searching the document body for the previously filled value. If the same text appears elsewhere naturally, it could be incorrectly replaced. The duplicate-value guard mitigates the worst case. A future improvement would use content controls or bookmarks as stable anchors.
-- **"First occurrence only" in Create mode:** When multiple occurrences exist, this option replaces `results.items[0]` (first in document order), not necessarily the user's selected instance. The button label makes this explicit.
+- **Occurrence targeting fallback:** In Create mode, when the selected text has multiple occurrences, `fetchCurrentSelection()` attempts to identify the exact selected occurrence via `Range.compareLocationWith()`. If it succeeds, the button shows "This occurrence (#N)." If it fails (e.g., selection changed between detection and button click), it falls back to the first occurrence.
 
 ## Office.js Gotchas
 
