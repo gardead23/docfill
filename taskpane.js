@@ -673,7 +673,7 @@ async function confirmReset() {
         await context.sync();
         for (const cc of ccs.items) {
           cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
-          cc.delete(false); // unwrap, leaving the placeholder text
+          cc.delete(true); // keep the placeholder text, remove the control wrapper
         }
         await context.sync();
       }
@@ -708,7 +708,7 @@ async function resetField(key) {
         found = true;
         for (const cc of ccs.items) {
           cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
-          cc.delete(false); // unwrap, leaving the placeholder text
+          cc.delete(true); // keep the placeholder text, remove the control wrapper
         }
         await context.sync();
       }
