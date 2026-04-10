@@ -2,6 +2,22 @@
 
 "use strict";
 
+// ── DocFill Tag Convention ───────────────────────────────────────────────────
+// Every DocFill content control has tag = "docfill:{key}".
+// This distinguishes DocFill fields from other CCs in the document.
+
+const DOCFILL_TAG_PREFIX = "docfill:";
+
+function isDocFillCC(cc) {
+  return !!(cc && cc.tag && cc.tag.startsWith(DOCFILL_TAG_PREFIX));
+}
+function ccTagToKey(tag) {
+  return tag.startsWith(DOCFILL_TAG_PREFIX) ? tag.slice(DOCFILL_TAG_PREFIX.length) : tag;
+}
+function keyToCCTag(key) {
+  return DOCFILL_TAG_PREFIX + key;
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 /** @type {{ key: string, label: string, type: string, dateFormat?: string }[]} */
@@ -30,7 +46,6 @@ function getGlobalDateFormat() {
 
 function setGlobalDateFormat(format) {
   try { localStorage.setItem(DATE_FORMAT_LS_KEY, format); } catch { /* ignore */ }
-  // Update all per-field dropdowns to reflect new default label
   document.querySelectorAll(".date-format-select").forEach((sel) => {
     const defaultOpt = sel.querySelector('option[value=""]');
     if (defaultOpt) defaultOpt.textContent = `Default (${formatDatePreview(format)})`;
@@ -51,16 +66,13 @@ let createdPlaceholders = [];
 let pendingCreateText = "";
 let pendingCreateName = "";
 let pendingCreateIndex = -1;
-/** @type {Record<string, number>} tracks which occurrence to navigate to next per placeholder */
 const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
-/** Index of the selected occurrence among all matches (for "This occurrence" targeting). -1 = unknown. */
 let lastSelectedOccurrenceIndex = -1;
 
 // ── Document Range Helpers ────────────────────────────────────────────────────
 
-/** Header/footer types to process. Lazily initialized after Office.js loads. */
 let HF_TYPES = null;
 function getHfTypes() {
   if (!HF_TYPES) {
@@ -69,10 +81,6 @@ function getHfTypes() {
   return HF_TYPES;
 }
 
-/**
- * Collect all searchable Body objects in the document (body + all header/footer bodies).
- * Must be called inside Word.run. Returns an array of Body objects after sync.
- */
 async function getAllBodies(context) {
   const bodies = [context.document.body];
   const sections = context.document.sections;
@@ -86,22 +94,15 @@ async function getAllBodies(context) {
       hfBodies.push(section.getFooter(hfType));
     }
   }
-  // Load text to check which are non-empty
   for (const b of hfBodies) b.load("text");
   await context.sync();
 
-  // Include all non-empty header/footer bodies (no dedup by text --
-  // two unlinked regions can legitimately have identical text).
   for (const b of hfBodies) {
     if (b.text && b.text.trim()) bodies.push(b);
   }
   return bodies;
 }
 
-/**
- * Search for text across all document bodies (body + headers/footers).
- * Returns a flat array of Range items. Must be called inside Word.run.
- */
 async function searchAllBodies(context, searchText, options) {
   const bodies = await getAllBodies(context);
   const allResults = [];
@@ -114,24 +115,15 @@ async function searchAllBodies(context, searchText, options) {
   return allResults.flatMap((r) => r.items);
 }
 
-/**
- * Deduplicate ranges that point to the same location (e.g., from linked headers).
- * Batches all Range.compareLocationWith() calls into a single sync for performance.
- * Must be called inside Word.run.
- */
 async function dedupeRanges(context, ranges) {
   if (ranges.length <= 1) return ranges;
-
-  // Queue all pairwise comparisons in one batch
   const comparisons = [];
   for (let i = 1; i < ranges.length; i++) {
     for (let j = 0; j < i; j++) {
       comparisons.push({ i, j, result: ranges[i].compareLocationWith(ranges[j]) });
     }
   }
-  await context.sync(); // single sync for all comparisons
-
-  // Mark duplicates
+  await context.sync();
   const duplicates = new Set();
   for (const { i, result } of comparisons) {
     if (duplicates.has(i)) continue;
@@ -143,7 +135,6 @@ async function dedupeRanges(context, ranges) {
       duplicates.add(i);
     }
   }
-
   return ranges.filter((_, idx) => !duplicates.has(idx));
 }
 
@@ -158,6 +149,52 @@ Office.onReady(function (info) {
   }
 });
 
+// ── DocFill CC Helpers ───────────────────────────────────────────────────────
+
+/**
+ * Get all DocFill content controls, grouped by key.
+ * Returns { key: { items: [cc, ...], text: string } }
+ */
+async function getAllDocFillCCs(context) {
+  const allCCs = context.document.contentControls;
+  allCCs.load("items,tag,text");
+  await context.sync();
+
+  const result = {};
+  for (const cc of allCCs.items) {
+    if (!isDocFillCC(cc)) continue;
+    const key = ccTagToKey(cc.tag);
+    if (!result[key]) result[key] = { items: [], text: cc.text };
+    result[key].items.push(cc);
+  }
+  return result;
+}
+
+/**
+ * Migrate old-style CCs (tag = raw key, no prefix) to docfill: prefix.
+ * Only migrates if the tag looks like a placeholder key and has no prefix.
+ */
+function migrateOldCC(cc) {
+  if (cc.tag && !cc.tag.startsWith(DOCFILL_TAG_PREFIX) && /^\w+$/.test(cc.tag)) {
+    cc.tag = keyToCCTag(cc.tag);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Convert a raw {{key}} text range into a DocFill content control.
+ * The CC wraps the range, with placeholder text shown inside.
+ */
+function convertRangeToCC(range, key) {
+  const cc = range.insertContentControl();
+  cc.tag = keyToCCTag(key);
+  cc.title = toTitleCase(key);
+  cc.appearance = Word.ContentControlAppearance.boundingBox;
+  cc.placeholderText = `{{${key}}}`;
+  return cc;
+}
+
 // ── Scan Document ──────────────────────────────────────────────────────────────
 
 async function scanDocument() {
@@ -165,85 +202,78 @@ async function scanDocument() {
   setScanButtonLoading(true);
 
   try {
-    // Compute fingerprint before scanning so storage key is document-scoped
     await computeDocumentFingerprint();
 
     await Word.run(async (context) => {
-      const body = context.document.body;
-      body.load("text");
-      // Also load content controls to detect filled fields
+      // ── Phase A: Discover and migrate existing CCs ──
       const allCCs = context.document.contentControls;
       allCCs.load("items,tag,text");
-
-      // Load header/footer text for placeholder scanning
-      const sections = context.document.sections;
-      sections.load("items");
       await context.sync();
 
-      const hfBodies = [];
-      for (const section of sections.items) {
-        for (const hfType of getHfTypes()) {
-          const h = section.getHeader(hfType);
-          const f = section.getFooter(hfType);
-          h.load("text");
-          f.load("text");
-          hfBodies.push(h, f);
-        }
-      }
-      await context.sync();
-
-      // Combine body + header/footer text for placeholder detection
-      // (duplicate keys from linked headers are harmless -- deduped via Set below)
-      let raw = body.text || "";
-      for (const hf of hfBodies) {
-        if (hf.text && hf.text.trim()) raw += " " + hf.text;
-      }
-      const matches = raw.match(/\{\{(\w+)\}\}/g) || [];
-      const docKeys = [...new Set(matches)].map((m) => m.replace(/\{\{|\}\}/g, ""));
-
-      // Build a map of currently filled fields from content controls
-      const ccFilledKeys = new Set();
-      const ccFilledValues = {};
+      // Migrate old-style CCs (no docfill: prefix)
+      let migrated = false;
       for (const cc of allCCs.items) {
-        if (cc.tag) {
-          ccFilledKeys.add(cc.tag);
-          // Store the first value found for each tag (for hydration on reopen)
-          if (!ccFilledValues[cc.tag]) ccFilledValues[cc.tag] = cc.text;
+        if (migrateOldCC(cc)) migrated = true;
+      }
+      if (migrated) await context.sync();
+
+      // Build map of DocFill CCs by key
+      const ccsByKey = {};
+      for (const cc of allCCs.items) {
+        if (!isDocFillCC(cc)) continue;
+        const key = ccTagToKey(cc.tag);
+        if (!ccsByKey[key]) ccsByKey[key] = [];
+        ccsByKey[key].push(cc);
+      }
+
+      // ── Phase B: Discover raw {{key}} text and convert to CCs ──
+      const bodies = await getAllBodies(context);
+      const rawKeys = new Set();
+      let convertedAny = false;
+
+      for (const b of bodies) {
+        try {
+          // Search for all {{placeholder}} patterns in this body
+          const results = b.search("{{*}}", { matchWildcards: true });
+          results.load("items,text");
+          await context.sync();
+
+          for (const range of results.items) {
+            const m = range.text.match(/^\{\{(\w+)\}\}$/);
+            if (!m) continue;
+            const key = m[1];
+            rawKeys.add(key);
+
+            // Only convert if no DocFill CC exists for this key in this range
+            if (!ccsByKey[key]) ccsByKey[key] = [];
+            convertRangeToCC(range, key);
+            convertedAny = true;
+          }
+        } catch (bodyErr) {
+          if (bodyErr.code !== "GeneralException") {
+            console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
+          }
         }
       }
+      if (convertedAny) await context.sync();
 
-      // Hydrate lastFilledValues from content controls for keys not yet in memory
-      // (handles reopen: content controls persist but in-memory state is empty)
-      for (const key of ccFilledKeys) {
-        if (!lastFilledValues[key] && !docKeys.includes(key)) {
-          lastFilledValues[key] = ccFilledValues[key] || "";
-        }
+      // Reload CCs after conversion
+      allCCs.load("items,tag,text");
+      await context.sync();
+
+      // Rebuild CC map
+      const ccMap = {};
+      for (const cc of allCCs.items) {
+        if (!isDocFillCC(cc)) continue;
+        const key = ccTagToKey(cc.tag);
+        if (!ccMap[key]) ccMap[key] = { items: [], text: cc.text };
+        ccMap[key].items.push(cc);
       }
 
-      // Sync state with doc: if a key appears as a {{placeholder}} it wasn't filled
-      // (or was undone via Ctrl+Z, which also removes the content control).
-      for (const key of docKeys) {
-        delete lastFilledValues[key];
-      }
-      // Also remove any keys that no longer have content controls
-      for (const key of Object.keys(lastFilledValues)) {
-        if (!ccFilledKeys.has(key)) {
-          delete lastFilledValues[key];
-        }
-      }
-      if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
-      if (ccFilledKeys.size > 0 && Object.keys(lastFilledValues).length > 0) hasFilled = true;
+      // ── Phase C: Build field list and hydrate state ──
+      const allKeys = Object.keys(ccMap);
 
-      // Merge: unfilled placeholders + filled fields (from memory and content controls)
-      const allKeys = new Set([...docKeys, ...Object.keys(lastFilledValues)]);
-
-      // Preserve original field order; append any brand-new keys at the end
-      const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.has(k));
-      const brandNewKeys = [...allKeys].filter((k) => !currentFields.some((f) => f.key === k));
-      const keys = [...orderedExisting, ...brandNewKeys];
-
-      if (keys.length === 0) {
-        // Clear stale form state and show empty state with guidance
+      if (allKeys.length === 0) {
         currentFields = [];
         currentStorageKey = "";
         document.getElementById("fields-section").style.display = "none";
@@ -255,11 +285,27 @@ async function scanDocument() {
         return;
       }
 
+      // Hydrate lastFilledValues from CCs
+      lastFilledValues = {};
+      for (const [key, data] of Object.entries(ccMap)) {
+        const text = data.text.trim();
+        // A CC is "filled" if its text is not the placeholder pattern and not empty
+        if (text && text !== `{{${key}}}`) {
+          lastFilledValues[key] = data.text;
+        }
+      }
+      hasFilled = Object.keys(lastFilledValues).length > 0;
+
+      // Preserve field order; append new keys at end
+      const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.includes(k));
+      const brandNewKeys = allKeys.filter((k) => !currentFields.some((f) => f.key === k));
+      const keys = [...orderedExisting, ...brandNewKeys];
+
       currentStorageKey = buildStorageKey(keys);
       const saved = loadFieldConfigsWithMigration(currentStorageKey, keys);
 
       currentFields = keys.map((key) => {
-        const savedType = saved[key]?.type === "number" ? "text" : saved[key]?.type; // migrate old "number"
+        const savedType = saved[key]?.type === "number" ? "text" : saved[key]?.type;
         return {
           key,
           label: saved[key]?.label || toTitleCase(key),
@@ -270,7 +316,6 @@ async function scanDocument() {
 
       saveFieldConfigs(currentStorageKey, currentFields);
       renderForm(currentFields);
-      if (Object.keys(lastFilledValues).length > 0) hasFilled = true; // may still be true for partial fills
       hideStatus();
     });
   } catch (err) {
@@ -298,7 +343,7 @@ function renderForm(fields) {
     row.className = "field-row";
     row.dataset.key = field.key;
 
-    const fieldType = field.type === "number" ? "text" : field.type; // migrate old "number" type
+    const fieldType = field.type === "number" ? "text" : field.type;
     if (field.type === "number") field.type = "text";
 
     row.innerHTML = `
@@ -337,7 +382,7 @@ function renderForm(fields) {
 
     fieldsList.appendChild(row);
 
-    // Restore filled value and show reset button if this field has been filled
+    // Restore filled value and show reset button
     if (lastFilledValues[field.key]) {
       if (field.type !== "date") {
         const input = row.querySelector(".field-value-input, .field-value-textarea");
@@ -348,19 +393,14 @@ function renderForm(fields) {
     }
   });
 
-  // Show global date format selector if any date fields exist
   renderGlobalDateFormat(fields);
 }
-
 
 function renderGlobalDateFormat(fields) {
   const container = document.getElementById("global-date-format");
   if (!container) return;
   const hasDateFields = fields.some((f) => f.type === "date");
-  if (!hasDateFields) {
-    container.style.display = "none";
-    return;
-  }
+  if (!hasDateFields) { container.style.display = "none"; return; }
   const current = getGlobalDateFormat();
   container.style.display = "flex";
   container.innerHTML = `
@@ -371,20 +411,12 @@ function renderGlobalDateFormat(fields) {
   `;
 }
 
-function onGlobalDateFormatChange(format) {
-  setGlobalDateFormat(format);
-}
+function onGlobalDateFormatChange(format) { setGlobalDateFormat(format); }
 
-/** Build the right input element based on field type. */
 function buildValueInput(field) {
   const id = `val-${field.key}`;
   if (field.type === "paragraph") {
-    return `<textarea
-      id="${id}"
-      class="field-value-textarea"
-      placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..."
-      rows="3"
-    ></textarea>`;
+    return `<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea>`;
   }
   if (field.type === "date") {
     const globalFmt = getGlobalDateFormat();
@@ -405,23 +437,13 @@ function buildValueInput(field) {
     </div>
     <div class="date-format-row">
       <span class="date-format-label">Format:</span>
-      <select
-        class="date-format-select"
-        id="datefmt-${field.key}"
-        onchange="setFieldDateFormat('${escapeAttr(field.key)}', this.value)"
-        title="Date output format"
-      >
+      <select class="date-format-select" id="datefmt-${field.key}" onchange="setFieldDateFormat('${escapeAttr(field.key)}', this.value)" title="Date output format">
         <option value="" ${!fieldFmt ? "selected" : ""}>Default (${formatDatePreview(globalFmt)})</option>
         ${DATE_FORMATS.map((f) => `<option value="${f.value}" ${fieldFmt === f.value ? "selected" : ""}>${f.label}</option>`).join("")}
       </select>
     </div>`;
   }
-  return `<input
-    id="${id}"
-    class="field-value-input"
-    type="text"
-    placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..."
-  />`;
+  return `<input id="${id}" class="field-value-input" type="text" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." />`;
 }
 
 // ── Field Edit Handlers ────────────────────────────────────────────────────────
@@ -429,24 +451,18 @@ function buildValueInput(field) {
 function setFieldType(key, newType) {
   const field = currentFields.find((f) => f.key === key);
   if (!field || field.type === newType) return;
-
   const oldValue = document.getElementById(`val-${key}`)?.value || "";
   field.type = newType;
   if (newType !== "date") delete field.dateFormat;
   saveFieldConfigs(currentStorageKey, currentFields);
-
-  // Rebuild the value input
   const row = document.querySelector(`.field-row[data-key="${key}"]`);
   if (!row) return;
-  // Remove old input + date dropdowns + date format row
   row.querySelectorAll(".field-value-input, .field-value-textarea, .date-dropdowns, .date-format-row").forEach((el) => el.remove());
   row.insertAdjacentHTML("beforeend", buildValueInput(field));
   if (newType !== "date") {
     const newInput = row.querySelector(".field-value-input, .field-value-textarea");
     if (newInput) newInput.value = oldValue;
   }
-
-  // Update pill active states
   row.querySelectorAll(".type-pill").forEach((pill) => {
     pill.classList.toggle("active", pill.dataset.type === newType);
   });
@@ -462,14 +478,12 @@ function setDateToday(key) {
   container.querySelector(".date-day").value = now.getDate();
 }
 
-/** Return how many days a given month/year has (handles leap years). */
 function daysInMonth(month, year) {
   if (!month) return 31;
   if (!year) year = new Date().getFullYear();
   return new Date(year, month, 0).getDate();
 }
 
-/** Re-build day <option>s for a date field based on the selected month/year. */
 function updateDayOptions(key) {
   const container = document.getElementById(`val-${key}`);
   if (!container) return;
@@ -480,18 +494,10 @@ function updateDayOptions(key) {
   const year = parseInt(yearSel.value, 10) || 0;
   const maxDay = daysInMonth(month, year);
   const currentDay = parseInt(daySel.value, 10) || 0;
-
-  // Rebuild options
   let html = '<option value="">Day</option>';
-  for (let d = 1; d <= maxDay; d++) {
-    html += `<option value="${d}">${d}</option>`;
-  }
+  for (let d = 1; d <= maxDay; d++) html += `<option value="${d}">${d}</option>`;
   daySel.innerHTML = html;
-
-  // Preserve selection, clamping if needed
-  if (currentDay > 0) {
-    daySel.value = currentDay > maxDay ? maxDay : currentDay;
-  }
+  if (currentDay > 0) daySel.value = currentDay > maxDay ? maxDay : currentDay;
 }
 
 function setFieldDateFormat(key, format) {
@@ -507,7 +513,6 @@ function onLabelChange(key, newLabel) {
   saveFieldConfigs(currentStorageKey, currentFields);
 }
 
-/** Auto-guess field type from key name on first scan. */
 function guessFieldType(key) {
   const k = key.toLowerCase();
   if (/date|day|month|year|when|start|end|deadline|due|expir|signed|effective/.test(k)) return "date";
@@ -516,16 +521,15 @@ function guessFieldType(key) {
 }
 
 // ── Fill Document ──────────────────────────────────────────────────────────────
+// All fields are DocFill CCs after scan. Fill simply updates CC text.
 
 async function fillDocument() {
   const btn = document.getElementById("fill-btn");
   const allValues = collectValues();
 
-  // Separate filled vs empty
   const toFill = Object.fromEntries(Object.entries(allValues).filter(([, v]) => v.trim()));
   const emptyKeys = Object.keys(allValues).filter((k) => !allValues[k].trim());
 
-  // Clear previous highlights
   document.querySelectorAll(".field-row.field-empty").forEach((r) => r.classList.remove("field-empty"));
 
   if (Object.keys(toFill).length === 0) {
@@ -533,7 +537,6 @@ async function fillDocument() {
     return;
   }
 
-  // Highlight skipped fields
   emptyKeys.forEach((key) => {
     document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
   });
@@ -544,83 +547,31 @@ async function fillDocument() {
 
   try {
     let totalReplaced = 0;
-    let regionsSkipped = 0;
 
     await Word.run(async (context) => {
       const keys = Object.keys(toFill);
 
-      // ── Phase 1: batch-check all keys for existing content controls (refill) ──
+      // Batch-load all CC collections for all keys in one sync
       const ccCollections = {};
       for (const key of keys) {
-        ccCollections[key] = context.document.contentControls.getByTag(key);
+        ccCollections[key] = context.document.contentControls.getByTag(keyToCCTag(key));
         ccCollections[key].load("items");
       }
       await context.sync();
 
-      const refillKeys = [];
-      const firstFillKeys = [];
+      // Update all CCs in one batch
       for (const key of keys) {
-        if (ccCollections[key].items.length > 0) {
-          refillKeys.push(key);
-        } else {
-          firstFillKeys.push(key);
+        for (const cc of ccCollections[key].items) {
+          cc.insertText(toFill[key], Word.InsertLocation.replace);
         }
+        totalReplaced += ccCollections[key].items.length;
       }
 
-      // ── Phase 2: batch-refill all existing content controls in one sync ──
-      if (refillKeys.length > 0) {
-        for (const key of refillKeys) {
-          for (const cc of ccCollections[key].items) {
-            cc.insertText(toFill[key], Word.InsertLocation.replace);
-          }
-          totalReplaced += ccCollections[key].items.length;
-        }
-        await context.sync();
-      }
-
-      // ── Phase 3: first-fill — process each body, batch all key searches per body ──
-      if (firstFillKeys.length > 0) {
-        const bodies = await getAllBodies(context);
-
-        for (const b of bodies) {
-          try {
-            // Queue all key searches on this body in one sync
-            const searches = {};
-            for (const key of firstFillKeys) {
-              searches[key] = b.search(`{{${key}}}`, { matchCase: true });
-              searches[key].load("items");
-            }
-            await context.sync();
-
-            // Process all results and queue replacements
-            let anyFound = false;
-            for (const key of firstFillKeys) {
-              for (const range of searches[key].items) {
-                const cc = range.insertContentControl();
-                cc.tag = key;
-                cc.title = key;
-                cc.appearance = Word.ContentControlAppearance.hidden;
-                cc.insertText(toFill[key], Word.InsertLocation.replace);
-                anyFound = true;
-              }
-              totalReplaced += searches[key].items.length;
-            }
-
-            if (anyFound) await context.sync();
-          } catch (bodyErr) {
-            if (bodyErr.code === "GeneralException") {
-              // Linked header already modified via linked copy — expected
-            } else {
-              regionsSkipped++;
-              console.warn("DocFill: skipped a region:", bodyErr.message || bodyErr);
-            }
-          }
-        }
-      }
+      if (totalReplaced > 0) await context.sync();
     });
 
     if (totalReplaced === 0) {
-      showStatus("No placeholders found — the document may already be filled.", "error");
+      showStatus("No fields found. Try scanning the document first.", "error");
     } else {
       hasFilled = true;
       Object.assign(lastFilledValues, toFill);
@@ -628,17 +579,11 @@ async function fillDocument() {
         const resetBtn = document.getElementById(`reset-btn-${key}`);
         if (resetBtn) resetBtn.style.display = "inline-flex";
       }
-      if (regionsSkipped > 0) {
-        showStatus(
-          `Filled with errors: ${regionsSkipped} region${regionsSkipped > 1 ? "s were" : " was"} skipped. Some placeholders may not have been replaced.`,
-          "error"
-        );
-      } else if (emptyKeys.length > 0) {
+      if (emptyKeys.length > 0) {
         const skipped = emptyKeys
           .map((k) => currentFields.find((f) => f.key === k)?.label || k)
           .join(", ");
         showStatus(`Done. Highlighted fields were skipped: ${skipped}`, "info");
-        // Scroll to the first skipped field so the user sees it
         const firstEmpty = document.querySelector(".field-row.field-empty");
         if (firstEmpty) firstEmpty.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } else {
@@ -664,15 +609,12 @@ function collectValues() {
         const d = container.querySelector(".date-day")?.value;
         const y = container.querySelector(".date-year")?.value;
         if (m && d && y) {
-          const mi = parseInt(m, 10);
-          const di = parseInt(d, 10);
-          const yi = parseInt(y, 10);
+          const mi = parseInt(m, 10), di = parseInt(d, 10), yi = parseInt(y, 10);
           const maxDay = daysInMonth(mi, yi);
           const pad = (n) => String(n).padStart(2, "0");
           const safeDay = di > maxDay ? maxDay : di;
           const isoDate = `${yi}-${pad(mi)}-${pad(safeDay)}`;
-          const fmt = field.dateFormat || globalFmt;
-          values[field.key] = formatDate(isoDate, fmt);
+          values[field.key] = formatDate(isoDate, field.dateFormat || globalFmt);
         } else {
           values[field.key] = "";
         }
@@ -710,7 +652,8 @@ function formatDate(isoDate, format) {
   }
 }
 
-// ── Clear Form ─────────────────────────────────────────────────────────────────
+// ── Reset ─────────────────────────────────────────────────────────────────────
+// Reset replaces CC text with {{key}} placeholder. CCs are NEVER deleted.
 
 async function clearForm() {
   if (hasFilled && Object.keys(lastFilledValues).length > 0) {
@@ -742,31 +685,26 @@ async function confirmReset() {
 
   try {
     await Word.run(async (context) => {
-      // Phase 1: replace filled text with placeholders inside content controls
-      for (const key of Object.keys(lastFilledValues)) {
-        const ccs = context.document.contentControls.getByTag(key);
-        ccs.load("items");
-        await context.sync();
-        for (const cc of ccs.items) {
+      // Batch-load all CC collections
+      const keysToReset = Object.keys(lastFilledValues);
+      const ccCollections = {};
+      for (const key of keysToReset) {
+        ccCollections[key] = context.document.contentControls.getByTag(keyToCCTag(key));
+        ccCollections[key].load("items");
+      }
+      await context.sync();
+
+      // Replace all CC text with placeholder text in one batch
+      for (const key of keysToReset) {
+        for (const cc of ccCollections[key].items) {
           cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
         }
-        await context.sync();
       }
-
-      // Phase 2: remove content control wrappers (must be a separate sync)
-      for (const key of Object.keys(lastFilledValues)) {
-        const ccs = context.document.contentControls.getByTag(key);
-        ccs.load("items");
-        await context.sync();
-        for (const cc of ccs.items) {
-          cc.delete(true); // keep the placeholder text, remove the control wrapper
-        }
-        await context.sync();
-      }
+      await context.sync();
     });
     hasFilled = false;
   } catch (err) {
-    showStatus("Failed to reset document: " + err.message, "error");
+    showStatus("Failed to reset: " + err.message, "error");
     if (clearBtn) { clearBtn.disabled = false; clearBtn.textContent = "Reset All Fields"; }
     return;
   }
@@ -785,24 +723,14 @@ async function resetField(key) {
   try {
     let found = false;
     await Word.run(async (context) => {
-      // Find content controls tagged with this placeholder key
-      const ccs = context.document.contentControls.getByTag(key);
+      const ccs = context.document.contentControls.getByTag(keyToCCTag(key));
       ccs.load("items");
       await context.sync();
 
       if (ccs.items.length > 0) {
         found = true;
-        // Phase 1: replace text
         for (const cc of ccs.items) {
           cc.insertText(`{{${key}}}`, Word.InsertLocation.replace);
-        }
-        await context.sync();
-        // Phase 2: remove control wrappers (separate sync)
-        const ccs2 = context.document.contentControls.getByTag(key);
-        ccs2.load("items");
-        await context.sync();
-        for (const cc of ccs2.items) {
-          cc.delete(true);
         }
         await context.sync();
       }
@@ -812,7 +740,6 @@ async function resetField(key) {
       delete lastFilledValues[key];
       const input = document.getElementById(`val-${key}`);
       if (input) {
-        // Check if this is a date field (container with date-select children)
         const dateSelects = input.querySelectorAll?.(".date-select");
         if (dateSelects && dateSelects.length > 0) {
           dateSelects.forEach((sel) => { sel.value = ""; });
@@ -824,7 +751,7 @@ async function resetField(key) {
       if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
     } else {
       if (resetBtn) resetBtn.disabled = false;
-      showStatus("Could not find this field in the document — it may have been edited directly.", "error");
+      showStatus("Could not find this field in the document.", "error");
     }
   } catch (err) {
     if (resetBtn) resetBtn.disabled = false;
@@ -833,10 +760,7 @@ async function resetField(key) {
 }
 
 function doFormClear() {
-  document.querySelectorAll(".field-value-input, .field-value-textarea").forEach((el) => {
-    el.value = "";
-  });
-  // Clear date dropdowns back to placeholder
+  document.querySelectorAll(".field-value-input, .field-value-textarea").forEach((el) => { el.value = ""; });
   document.querySelectorAll(".date-dropdowns").forEach((container) => {
     container.querySelectorAll(".date-select").forEach((sel) => { sel.value = ""; });
   });
@@ -849,27 +773,15 @@ function doFormClear() {
 // ── localStorage ───────────────────────────────────────────────────────────────
 
 const LS_PREFIX = "template-filler:";
-
-/** A short fingerprint of the document to scope persistence. */
 let documentFingerprint = "";
 
-/**
- * Build a stable fingerprint from the document's template text.
- * Includes body + all header/footer text.
- * Strips both {{placeholder}} patterns and content-control text (filled values)
- * so the fingerprint is the same before and after filling.
- */
 async function computeDocumentFingerprint() {
   try {
     await Word.run(async (context) => {
       const body = context.document.body;
       body.load("text");
-
-      // Load content controls to identify filled regions
       const allCCs = context.document.contentControls;
-      allCCs.load("items,text");
-
-      // Load header/footer text
+      allCCs.load("items,tag,text");
       const sections = context.document.sections;
       sections.load("items");
       await context.sync();
@@ -886,21 +798,17 @@ async function computeDocumentFingerprint() {
       }
       await context.sync();
 
-      // Combine all text sources
       let raw = body.text || "";
       for (const hf of hfBodies) {
         if (hf.text && hf.text.trim()) raw += " " + hf.text;
       }
 
-      // Remove filled values (content control text) so fingerprint is stable after fill
+      // Strip DocFill CC text and placeholder patterns for stability
       for (const cc of allCCs.items) {
-        if (cc.text) raw = raw.replace(cc.text, "");
+        if (isDocFillCC(cc) && cc.text) raw = raw.replace(cc.text, "");
       }
-
-      // Strip {{placeholders}} and whitespace, take first 300 chars
       const stripped = raw.replace(/\{\{\w+\}\}/g, "").replace(/\s+/g, " ").trim().substring(0, 300);
 
-      // djb2 hash
       let hash = 5381;
       for (let i = 0; i < stripped.length; i++) {
         hash = ((hash << 5) + hash + stripped.charCodeAt(i)) >>> 0;
@@ -914,26 +822,16 @@ async function computeDocumentFingerprint() {
 
 function buildStorageKey(keys) {
   const base = [...keys].sort().join(",");
-  return documentFingerprint
-    ? LS_PREFIX + documentFingerprint + ":" + base
-    : LS_PREFIX + base;
+  return documentFingerprint ? LS_PREFIX + documentFingerprint + ":" + base : LS_PREFIX + base;
 }
 
-/**
- * Try to load configs from the fingerprinted key first.
- * If nothing found and a fingerprint is set, fall back to the old un-fingerprinted key
- * and migrate the data forward.
- */
 function loadFieldConfigsWithMigration(fingerprintedKey, keys) {
   let data = loadFieldConfigs(fingerprintedKey);
   if (Object.keys(data).length > 0) return data;
-
-  // Fall back to legacy key (no fingerprint)
   if (documentFingerprint) {
     const legacyKey = LS_PREFIX + [...keys].sort().join(",");
     data = loadFieldConfigs(legacyKey);
     if (Object.keys(data).length > 0) {
-      // Migrate to fingerprinted key
       try { localStorage.setItem(fingerprintedKey, JSON.stringify(data)); } catch { /* ignore */ }
       return data;
     }
@@ -1001,13 +899,10 @@ function escapeAttr(str) {
 function switchTab(tab) {
   if (tab === activeTab) return;
   activeTab = tab;
-
   document.getElementById("tab-btn-create").classList.toggle("active", tab === "create");
   document.getElementById("tab-btn-fill").classList.toggle("active", tab === "fill");
-
   document.getElementById("panel-create").style.display = tab === "create" ? "flex" : "none";
   document.getElementById("panel-fill").style.display = tab === "fill" ? "block" : "none";
-
   if (tab === "create") {
     document.getElementById("actions").style.display = "none";
     fetchCurrentSelection();
@@ -1033,18 +928,13 @@ async function fetchCurrentSelection() {
       sel.load("text");
       await context.sync();
       const text = sel.text.trim();
-      // Ignore multi-paragraph selections (Word returns \r between paragraphs)
       lastSelectedText = text.includes("\r") || text.includes("\n") ? "" : text;
       lastSelectedOccurrenceIndex = -1;
 
-      // If text exists and might have multiple occurrences, find which one is selected
-      // Search all bodies (body + headers/footers) to match the replacement domain
       if (lastSelectedText && lastSelectedText.length > 0) {
         const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: true });
         const items = await dedupeRanges(context, rawItems);
-
         if (items.length > 1) {
-          // Compare each result with the selection to find the matching one
           for (let i = 0; i < items.length; i++) {
             const loc = sel.compareLocationWith(items[i]);
             await context.sync();
@@ -1061,28 +951,22 @@ async function fetchCurrentSelection() {
 
       updateSelectionPreview(lastSelectedText);
     });
-  } catch {
-    // ignore — selection may change during async fetch
-  } finally {
-    selectionFetchInProgress = false;
-  }
+  } catch { /* ignore */ }
+  finally { selectionFetchInProgress = false; }
 }
 
 function updateSelectionPreview(text) {
   const preview = document.getElementById("selection-preview");
   const nameInput = document.getElementById("placeholder-name-input");
   if (!preview || !nameInput) return;
-
   if (!text) {
     preview.className = "selection-preview";
     preview.innerHTML = '<span class="selection-hint-text">Select text in your document to get started</span>';
     return;
   }
-
-  const display = text.length > 60 ? text.substring(0, 60) + "…" : text;
+  const display = text.length > 60 ? text.substring(0, 60) + "\u2026" : text;
   preview.className = "selection-preview has-selection";
   preview.innerHTML = `<span class="selection-label">Selected</span><span class="selection-text">"${escapeHtml(display)}"</span>`;
-
   const suggested = suggestPlaceholderName(text);
   if (!nameInput.value || nameInput.value === lastSuggestedName) {
     nameInput.value = suggested;
@@ -1091,35 +975,21 @@ function updateSelectionPreview(text) {
 }
 
 function suggestPlaceholderName(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/_+$/, "")
-    .substring(0, 40);
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim()
+    .replace(/\s+/g, "_").replace(/_+$/, "").substring(0, 40);
 }
 
 // ── Create Placeholder ─────────────────────────────────────────────────────────
+// Create mode now inserts DocFill CCs directly instead of raw {{text}}.
 
 async function createPlaceholder() {
   const text = lastSelectedText;
   const nameInput = document.getElementById("placeholder-name-input");
   const name = nameInput.value.trim();
 
-  if (!text) {
-    showCreateStatus("Select some text in the document first.", "error");
-    return;
-  }
-  if (!name) {
-    showCreateStatus("Enter a placeholder name.", "error");
-    nameInput.focus();
-    return;
-  }
-  if (!/^\w+$/.test(name)) {
-    showCreateStatus("Use only letters, numbers, and underscores.", "error");
-    return;
-  }
+  if (!text) { showCreateStatus("Select some text in the document first.", "error"); return; }
+  if (!name) { showCreateStatus("Enter a placeholder name.", "error"); nameInput.focus(); return; }
+  if (!/^\w+$/.test(name)) { showCreateStatus("Use only letters, numbers, and underscores.", "error"); return; }
 
   const btn = document.getElementById("create-replace-btn");
   btn.disabled = true;
@@ -1133,13 +1003,9 @@ async function createPlaceholder() {
     await Word.run(async (context) => {
       const rawItems = await searchAllBodies(context, text, { matchCase: true });
       const items = await dedupeRanges(context, rawItems);
-
       occurrenceCount = items.length;
 
-      if (occurrenceCount === 0) {
-        shouldProceed = false;
-        return;
-      }
+      if (occurrenceCount === 0) { shouldProceed = false; return; }
 
       if (occurrenceCount > 1) {
         shouldProceed = false;
@@ -1150,12 +1016,18 @@ async function createPlaceholder() {
         return;
       }
 
-      items[0].insertText(`{{${name}}}`, Word.InsertLocation.replace);
+      // Single occurrence: replace text and wrap in DocFill CC
+      const cc = items[0].insertContentControl();
+      cc.tag = keyToCCTag(name);
+      cc.title = toTitleCase(name);
+      cc.appearance = Word.ContentControlAppearance.boundingBox;
+      cc.placeholderText = `{{${name}}}`;
+      cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
       await context.sync();
     });
 
     if (!shouldProceed && occurrenceCount === 0) {
-      showCreateStatus("Could not find that text in the document — try selecting it again.", "error");
+      showCreateStatus("Could not find that text in the document -- try selecting it again.", "error");
     } else if (shouldProceed) {
       onPlaceholderCreated(name, occurrenceCount);
     }
@@ -1186,7 +1058,6 @@ function showReplaceAllConfirm(count, name, selectedIndex) {
 
 async function confirmReplace(replaceAll) {
   hideCreateStatus();
-
   const text = pendingCreateText;
   const name = pendingCreateName;
   const targetIndex = pendingCreateIndex;
@@ -1203,26 +1074,42 @@ async function confirmReplace(replaceAll) {
     let count = 0;
     await Word.run(async (context) => {
       if (replaceAll) {
-        // Process each body sequentially so linked headers don't double-replace
         const bodies = await getAllBodies(context);
         for (const b of bodies) {
-          const results = b.search(text, { matchCase: true });
-          results.load("items");
-          await context.sync();
-          if (results.items.length > 0) {
-            count += results.items.length;
-            results.items.forEach((item) => item.insertText(`{{${name}}}`, Word.InsertLocation.replace));
+          try {
+            const results = b.search(text, { matchCase: true });
+            results.load("items");
             await context.sync();
+            if (results.items.length > 0) {
+              for (const range of results.items) {
+                const cc = range.insertContentControl();
+                cc.tag = keyToCCTag(name);
+                cc.title = toTitleCase(name);
+                cc.appearance = Word.ContentControlAppearance.boundingBox;
+                cc.placeholderText = `{{${name}}}`;
+                cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
+              }
+              count += results.items.length;
+              await context.sync();
+            }
+          } catch (bodyErr) {
+            if (bodyErr.code !== "GeneralException") {
+              console.warn("DocFill: error in create:", bodyErr.message || bodyErr);
+            }
           }
         }
       } else {
-        // Single occurrence: dedupe linked ranges then replace one
         const rawItems = await searchAllBodies(context, text, { matchCase: true });
         const items = await dedupeRanges(context, rawItems);
         if (items.length === 0) return;
         const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
+        const cc = items[idx].insertContentControl();
+        cc.tag = keyToCCTag(name);
+        cc.title = toTitleCase(name);
+        cc.appearance = Word.ContentControlAppearance.boundingBox;
+        cc.placeholderText = `{{${name}}}`;
+        cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         count = 1;
-        items[idx].insertText(`{{${name}}}`, Word.InsertLocation.replace);
         await context.sync();
       }
     });
@@ -1241,37 +1128,21 @@ function onPlaceholderCreated(name, count) {
   lastSuggestedName = "";
   lastSelectedText = "";
   updateSelectionPreview("");
-
-  // Merge into existing entry if the same placeholder was created again (e.g. after Ctrl+Z)
   const existing = createdPlaceholders.find((e) => e.name === name);
-  if (existing) {
-    existing.count += count;
-  } else {
-    createdPlaceholders.push({ name, count });
-  }
-
+  if (existing) { existing.count += count; } else { createdPlaceholders.push({ name, count }); }
   renderCreatedList();
-  showCreateStatus(
-    `✓ Created {{${name}}}${count > 1 ? ` — replaced ${count} occurrences` : ""}.`,
-    "success"
-  );
+  showCreateStatus(`Created {{${name}}}${count > 1 ? ` -- replaced ${count} occurrences` : ""}.`, "success");
 }
 
 function renderCreatedList() {
   const section = document.getElementById("created-list-section");
   const list = document.getElementById("created-list");
   const doneBtn = document.getElementById("done-fill-btn");
-
-  if (createdPlaceholders.length === 0) {
-    section.style.display = "none";
-    doneBtn.style.display = "none";
-    return;
-  }
-
+  if (createdPlaceholders.length === 0) { section.style.display = "none"; doneBtn.style.display = "none"; return; }
   section.style.display = "block";
   doneBtn.style.display = "block";
   list.innerHTML = createdPlaceholders
-    .map((e) => `<span class="created-chip" onclick="navigateToChip('${escapeAttr(e.name)}')" title="Click to highlight in document">{{${escapeHtml(e.name)}}}${e.count > 1 ? `<span class="chip-count">×${e.count}</span>` : ""}</span>`)
+    .map((e) => `<span class="created-chip" onclick="navigateToChip('${escapeAttr(e.name)}')" title="Click to highlight in document">{{${escapeHtml(e.name)}}}${e.count > 1 ? `<span class="chip-count">\u00d7${e.count}</span>` : ""}</span>`)
     .join("");
 }
 
@@ -1279,29 +1150,29 @@ async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
   try {
     await Word.run(async (context) => {
-      const rawItems = await searchAllBodies(context, `{{${name}}}`, { matchCase: true });
-      const items = await dedupeRanges(context, rawItems);
+      // Navigate via DocFill CCs instead of text search
+      const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
+      ccs.load("items");
+      await context.sync();
 
-      if (items.length === 0) {
-        showCreateStatus(`{{${name}}} not found — it may have been filled or removed.`, "error");
+      if (ccs.items.length === 0) {
+        showCreateStatus(`{{${name}}} not found.`, "error");
         return;
       }
 
-      // Sync count if doc has more/fewer occurrences than tracked (e.g. user added one manually)
       const entry = createdPlaceholders.find((e) => e.name === name);
-      if (entry && entry.count !== items.length) {
-        entry.count = items.length;
+      if (entry && entry.count !== ccs.items.length) {
+        entry.count = ccs.items.length;
         renderCreatedList();
       }
 
-      const targetIdx = idx % items.length;
-      items[targetIdx].select();
+      const targetIdx = idx % ccs.items.length;
+      ccs.items[targetIdx].select();
       await context.sync();
+      chipNavIndex[name] = (targetIdx + 1) % ccs.items.length;
 
-      chipNavIndex[name] = (targetIdx + 1) % items.length;
-
-      if (items.length > 1) {
-        showCreateStatus(`{{${name}}} — occurrence ${targetIdx + 1} of ${items.length}`, "info");
+      if (ccs.items.length > 1) {
+        showCreateStatus(`{{${name}}} -- occurrence ${targetIdx + 1} of ${ccs.items.length}`, "info");
       } else {
         hideCreateStatus();
       }

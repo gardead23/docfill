@@ -54,20 +54,30 @@ Four top-level state variables:
 - `chipNavIndex` — `Record<string, number>` tracks which occurrence to navigate to next per placeholder
 - `selectionDebounceTimer / selectionFetchInProgress` — guard against overlapping Word.run calls
 
-### Content controls for fill tracking
-When `fillDocument()` replaces a `{{placeholder}}` with a value, it wraps the inserted text in a hidden content control (`appearance: "hidden"`) tagged with the placeholder key (`cc.tag = key`). This provides stable document anchors for refill and reset operations.
+### Content controls as first-class field objects
 
-**First fill:** Search all bodies (body + headers/footers) for `{{key}}` text, replace with value, wrap in tagged content control.
-**Refill:** Find content controls by tag (`contentControls.getByTag(key)`), replace their text directly. No text-search needed.
-**Per-field reset:** Find content control by tag, replace text with `{{key}}`, unwrap control (`cc.delete(false)`).
-**Reset all fields:** Iterates all keys in `lastFilledValues`, finds their content controls, replaces with `{{key}}`, unwraps. Preserves any edits the user made after filling (no OOXML rollback).
+DocFill uses Word content controls as permanent, stable field anchors. `{{placeholder}}` text is only an authoring/import format -- on scan, each is converted into a DocFill CC.
 
-Content controls persist across save/reopen (they are native Word OOXML elements: `<w:sdt>`). Tags are not unique -- multiple occurrences of the same placeholder share the same tag, and `getByTag()` returns all of them.
+**Tag convention:** Every DocFill CC has `tag = "docfill:{key}"`. The `docfill:` prefix distinguishes DocFill fields from other CCs. Helper functions: `isDocFillCC(cc)`, `ccTagToKey(tag)`, `keyToCCTag(key)`.
 
-`lastFilledValues` is still maintained for UI state (form values, reset button visibility) but is no longer used for document-level text searching.
+**CC properties:** `tag = "docfill:{key}"`, `title = "Title Case Label"`, `appearance = "boundingBox"`, `placeholderText = "{{key}}"`.
+
+**Scan (Phase A):** Discovers existing DocFill CCs via tag prefix filter. Migrates old-style CCs (tag = raw key, no prefix) to `docfill:` prefix.
+**Scan (Phase B):** Finds raw `{{key}}` text patterns across all bodies (body + headers/footers). Converts each to a DocFill CC by wrapping the range.
+**Scan (Phase C):** Builds field list from all DocFill CCs. Hydrates `lastFilledValues` from CCs whose text is not their placeholder pattern.
+
+**Fill:** All fields are CCs after scan. Fill simply finds CCs by tag (`contentControls.getByTag(keyToCCTag(key))`), replaces their text. Batched: one sync to load all collections, one sync to apply all updates.
+
+**Reset:** Replaces CC text with `{{key}}`. CCs are **never deleted** -- they persist through fill/reset/reopen. This is the architectural invariant that makes the system stable.
+
+**Create mode:** Inserts DocFill CCs directly (not raw `{{text}}`). The CC wraps the selected text with proper tag, title, appearance, and placeholderText.
+
+**Chip navigation:** Uses `contentControls.getByTag(keyToCCTag(name))` instead of text search. Cycles through CCs by index.
+
+Content controls persist across save/reopen (native Word OOXML elements: `<w:sdt>`). Tags are not unique -- multiple occurrences of the same placeholder share the same tag.
 
 ### Header/footer support
-All scan, fill, and create operations process the full document: body + all section headers and footers (Primary, FirstPage, EvenPages). Helper functions `getAllBodies(context)` and `searchAllBodies(context, text, options)` enumerate all non-empty Body objects. Content controls in headers/footers are found by the same `contentControls.getByTag()` call (it's document-wide).
+All scan, fill, and create operations process the full document: body + all section headers and footers (Primary, FirstPage, EvenPages). Helper functions `getAllBodies(context)` and `searchAllBodies(context, text, options)` enumerate all non-empty Body objects. Content controls in headers/footers are found by the same `contentControls.getByTag()` call (it's document-wide). Linked headers (Link to Previous) are handled by processing bodies sequentially for mutating operations -- placeholders already consumed by a linked copy are naturally skipped.
 
 ### Selection monitoring in Create mode
 - `DocumentSelectionChanged` event fires on every cursor move — always registered, but handler returns immediately if `activeTab !== 'create'`
@@ -82,11 +92,10 @@ Word Range objects only live within their `Word.run` context — they cannot be 
 
 ### Chip navigation
 Clicking a `{{name}}` chip in "Created so far" calls `navigateToChip(name)`, which:
-1. Searches the doc for `{{name}}` occurrences
-2. Syncs the chip's displayed count if the actual occurrence count has changed (e.g., user added one manually)
-3. Calls `results.items[targetIdx].select()` to scroll to and highlight that occurrence
-4. Cycles through occurrences on successive clicks (`chipNavIndex[name]`)
-Uses `Range.select()` (WordApi 1.1).
+1. Finds DocFill CCs by tag (`contentControls.getByTag(keyToCCTag(name))`)
+2. Syncs the chip's displayed count if the actual CC count has changed
+3. Calls `ccs.items[targetIdx].select()` to scroll to and highlight that CC
+4. Cycles through CCs on successive clicks (`chipNavIndex[name]`)
 
 ### Multi-occurrence replacement confirmation
 When `createPlaceholder()` finds more than one occurrence, it stores `pendingCreateText` / `pendingCreateName` and renders an inline confirmation with three options:
@@ -121,7 +130,7 @@ After a fill, rescanning finds fewer placeholders (consumed ones are gone). To p
 2. Reconstruct order using `orderedExisting` (filter `currentFields` against the merged set) + `brandNewKeys` (truly new keys appended at the end)
 
 ### Ctrl+Z state sync
-When `scanDocument()` runs, it checks both raw `{{placeholder}}` text in the document body and the presence of content controls. For any key that appears as `{{placeholder}}` text, that key is deleted from `lastFilledValues` (the fill was undone). Additionally, any key in `lastFilledValues` that no longer has a corresponding content control is also removed. This handles cases where the user undid a fill via Ctrl+Z (which removes both the text change and the content control), keeping DocFill's state consistent with the document.
+When `scanDocument()` runs, it rebuilds `lastFilledValues` entirely from DocFill CCs. A CC whose text matches `{{key}}` or is empty is "unfilled." A CC with any other text is "filled" and its value is hydrated into `lastFilledValues`. If a user undoes a fill via Ctrl+Z, the CC's text reverts to its previous state, and the next scan picks up the change. If a CC is deleted entirely (user manually removed it), the key disappears from the field list.
 
 ### localStorage persistence
 Field labels, types, and per-field date formats are saved keyed by document fingerprint + sorted placeholder keys. The fingerprint is a djb2 hash of the first 200 non-placeholder characters of the document body, distinguishing templates that share the same placeholder names but have different surrounding text.
@@ -168,14 +177,14 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 
 ## Testing
 
-Pure logic functions are extracted to `lib/pure.js` and tested with Vitest:
+Pure logic functions are extracted to `lib/pure.mjs` and tested with Vitest:
 
 ```bash
 npm test        # run once
 npm run test:watch  # watch mode
 ```
 
-32 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`.
+48 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`, `isDocFillCC`, `ccTagToKey`, `keyToCCTag`, `placeholderText`, `isCCUnfilled`.
 
 CI runs on every push/PR to `main` via GitHub Actions (`.github/workflows/ci.yml`): syntax check, manifest validation, and test suite.
 

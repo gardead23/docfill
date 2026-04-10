@@ -8,6 +8,12 @@ import {
   daysInMonth,
   formatDate,
   buildStorageKey,
+  DOCFILL_TAG_PREFIX,
+  isDocFillCC,
+  ccTagToKey,
+  keyToCCTag,
+  placeholderText,
+  isCCUnfilled,
 } from "../lib/pure.mjs";
 
 // ── toTitleCase ──────────────────────────────────────────────────────────────
@@ -191,5 +197,83 @@ describe("buildStorageKey", () => {
     const key1 = buildStorageKey(["z", "a", "m"], "fp");
     const key2 = buildStorageKey(["a", "m", "z"], "fp");
     expect(key1).toBe(key2);
+  });
+});
+
+// ── DocFill CC Helpers ───────────────────────────────────────────────────────
+
+describe("isDocFillCC", () => {
+  it("returns true for docfill-prefixed tag", () => {
+    expect(isDocFillCC({ tag: "docfill:client_name" })).toBe(true);
+  });
+
+  it("returns false for non-prefixed tag", () => {
+    expect(isDocFillCC({ tag: "client_name" })).toBe(false);
+  });
+
+  it("returns false for empty tag", () => {
+    expect(isDocFillCC({ tag: "" })).toBe(false);
+  });
+
+  it("returns false for null/undefined", () => {
+    expect(isDocFillCC(null)).toBe(false);
+    expect(isDocFillCC(undefined)).toBe(false);
+    expect(isDocFillCC({ tag: null })).toBe(false);
+  });
+
+  it("returns false for other add-in tags", () => {
+    expect(isDocFillCC({ tag: "other-addin:field" })).toBe(false);
+  });
+});
+
+describe("ccTagToKey", () => {
+  it("strips docfill prefix", () => {
+    expect(ccTagToKey("docfill:client_name")).toBe("client_name");
+  });
+
+  it("returns tag as-is if no prefix", () => {
+    expect(ccTagToKey("client_name")).toBe("client_name");
+  });
+
+  it("handles keys with underscores", () => {
+    expect(ccTagToKey("docfill:first_middle_last")).toBe("first_middle_last");
+  });
+});
+
+describe("keyToCCTag", () => {
+  it("adds docfill prefix", () => {
+    expect(keyToCCTag("client_name")).toBe("docfill:client_name");
+  });
+
+  it("handles empty key", () => {
+    expect(keyToCCTag("")).toBe("docfill:");
+  });
+});
+
+describe("placeholderText", () => {
+  it("wraps key in double braces", () => {
+    expect(placeholderText("name")).toBe("{{name}}");
+  });
+});
+
+describe("isCCUnfilled", () => {
+  it("returns true when text matches placeholder", () => {
+    expect(isCCUnfilled("{{client_name}}", "client_name")).toBe(true);
+  });
+
+  it("returns true when text is empty", () => {
+    expect(isCCUnfilled("", "client_name")).toBe(true);
+  });
+
+  it("returns true when text is whitespace around placeholder", () => {
+    expect(isCCUnfilled("  {{client_name}}  ", "client_name")).toBe(true);
+  });
+
+  it("returns false when text is a filled value", () => {
+    expect(isCCUnfilled("Acme Corp", "client_name")).toBe(false);
+  });
+
+  it("returns false when text is a different placeholder", () => {
+    expect(isCCUnfilled("{{other_key}}", "client_name")).toBe(false);
   });
 });
