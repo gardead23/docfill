@@ -207,6 +207,9 @@ async function scanDocument() {
   showStatus("Scanning document...", "info");
   setScanButtonLoading(true);
 
+  let keysFoundInBody = false;
+  let hadExistingCCs = false;
+
   try {
     await computeDocumentFingerprint();
 
@@ -225,12 +228,15 @@ async function scanDocument() {
 
       // Build map of DocFill CCs by key
       const ccsByKey = {};
+      let ccCount = 0;
       for (const cc of allCCs.items) {
         if (!isDocFillCC(cc)) continue;
+        ccCount++;
         const key = ccTagToKey(cc.tag);
         if (!ccsByKey[key]) ccsByKey[key] = [];
         ccsByKey[key].push(cc);
       }
+      hadExistingCCs = ccCount > 0;
 
       // ── Phase B: Discover raw {{key}} text and convert to CCs ──
       // Quick check: does the body text we already loaded contain any raw {{}} patterns?
@@ -243,6 +249,7 @@ async function scanDocument() {
       const bodyText = mainBody.text || "";
       const bodyMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
       const keysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+      keysFoundInBody = keysInBody.length > 0;
 
       let convertedAny = false;
 
@@ -349,13 +356,23 @@ async function scanDocument() {
 
   setScanButtonLoading(false);
 
-  // ── Deferred HF scan: check headers/footers for raw placeholders ──
-  // Disable Fill while running so user can't fill before all fields are discovered.
+  // ── Deferred HF scan: only needed on first scan or when body had raw placeholders ──
+  // On rescan (CCs already exist), HF fields are already covered by persistent CCs.
+  // The user can add new HF placeholders and click Rescan -- the body scan will
+  // recreate scanInProgress=false and this block runs again.
+  // HF scan needed when:
+  // - No CCs existed before scan (fresh template, might have HF-only placeholders)
+  // - Body had raw placeholders (template just imported, HF likely has them too)
+  // On rescan with existing CCs and no new body placeholders, HF is skipped
+  // because persistent CCs already cover all fields including headers.
+  const needsHfScan = !hadExistingCCs || keysFoundInBody;
   try {
-    const fillBtn = document.getElementById("fill-btn");
-    if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
-    await scanHeaderFooters();
-    if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+    if (needsHfScan) {
+      const fillBtn = document.getElementById("fill-btn");
+      if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
+      await scanHeaderFooters();
+      if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+    }
   } finally {
     scanInProgress = false;
   }
