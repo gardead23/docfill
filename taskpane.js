@@ -273,78 +273,13 @@ async function scanDocument() {
         }
       }
 
-      // Check headers/footers for raw placeholders.
-      // Load all HF body text (cheap: one load + one sync), then only run
-      // the expensive search/convert loop on bodies that have raw {{}} text.
-      const hfSections = context.document.sections;
-      hfSections.load("items");
-      await context.sync();
-
-      const hfBodies = [];
-      for (const section of hfSections.items) {
-        for (const hfType of getHfTypes()) {
-          hfBodies.push(section.getHeader(hfType));
-          hfBodies.push(section.getFooter(hfType));
-        }
-      }
-      for (const b of hfBodies) b.load("text");
-      await context.sync();
-
-      // Filter to bodies that actually contain raw placeholder text
-      const relevantHfBodies = hfBodies.filter((b) => {
-        const t = b.text && b.text.trim();
-        return t && /\{\{\w+\}\}/.test(t);
-      });
-
-      for (const b of relevantHfBodies) {
-        try {
-          const hfText = b.text || "";
-          const hfMatches = hfText.match(/\{\{(\w+)\}\}/g) || [];
-          const hfKeys = [...new Set(hfMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
-          if (hfKeys.length === 0) continue;
-
-          const hfSearches = {};
-          for (const key of hfKeys) {
-            hfSearches[key] = b.search(`{{${key}}}`, { matchCase: true });
-            hfSearches[key].load("items");
-          }
-          await context.sync();
-
-          const hfRangeEntries = [];
-          for (const key of hfKeys) {
-            for (const range of hfSearches[key].items) {
-              const parentCC = range.parentContentControlOrNullObject;
-              parentCC.load("tag");
-              hfRangeEntries.push({ key, range, parentCC });
-            }
-          }
-          if (hfRangeEntries.length === 0) continue;
-          await context.sync();
-
-          let foundInHf = false;
-          for (const { key, range, parentCC } of hfRangeEntries) {
-            const insideExisting = !parentCC.isNullObject &&
-              parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
-            if (!insideExisting) {
-              if (!ccsByKey[key]) ccsByKey[key] = [];
-              convertRangeToCC(range, key);
-              foundInHf = true;
-              convertedAny = true;
-            }
-          }
-          if (foundInHf) await context.sync();
-        } catch (bodyErr) {
-          if (bodyErr.code !== "GeneralException") {
-            console.warn("DocFill: error scanning a header/footer:", bodyErr.message || bodyErr);
-          }
-        }
+      // Reload CCs after body conversion
+      if (convertedAny) {
+        allCCs.load("items,tag,text");
+        await context.sync();
       }
 
-      // Reload CCs after conversion
-      allCCs.load("items,tag,text");
-      await context.sync();
-
-      // Rebuild CC map
+      // Rebuild CC map from current state
       const ccMap = {};
       for (const cc of allCCs.items) {
         if (!isDocFillCC(cc)) continue;
@@ -354,9 +289,10 @@ async function scanDocument() {
       }
 
       // ── Phase C: Build field list and hydrate state ──
+      // Render form immediately from body + existing CCs (fast path)
       const allKeys = Object.keys(ccMap);
 
-      if (allKeys.length === 0) {
+      if (allKeys.length === 0 && keysInBody.length === 0) {
         currentFields = [];
         currentStorageKey = "";
         document.getElementById("fields-section").style.display = "none";
@@ -406,6 +342,87 @@ async function scanDocument() {
   }
 
   setScanButtonLoading(false);
+
+  // ── Deferred HF scan: check headers/footers for raw placeholders ──
+  // Runs after the form is visible so the user isn't blocked.
+  scanHeaderFooters();
+}
+
+/** Scan headers/footers for raw {{key}} text and convert to CCs. Runs in background after main scan. */
+async function scanHeaderFooters() {
+  try {
+    let foundNew = false;
+    await Word.run(async (context) => {
+      const sections = context.document.sections;
+      sections.load("items");
+      await context.sync();
+
+      const hfBodies = [];
+      for (const section of sections.items) {
+        for (const hfType of getHfTypes()) {
+          hfBodies.push(section.getHeader(hfType));
+          hfBodies.push(section.getFooter(hfType));
+        }
+      }
+      for (const b of hfBodies) b.load("text");
+      await context.sync();
+
+      const relevantHfBodies = hfBodies.filter((b) => {
+        const t = b.text && b.text.trim();
+        return t && /\{\{\w+\}\}/.test(t);
+      });
+
+      if (relevantHfBodies.length === 0) return;
+
+      for (const b of relevantHfBodies) {
+        try {
+          const hfText = b.text || "";
+          const hfMatches = hfText.match(/\{\{(\w+)\}\}/g) || [];
+          const hfKeys = [...new Set(hfMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+          if (hfKeys.length === 0) continue;
+
+          const hfSearches = {};
+          for (const key of hfKeys) {
+            hfSearches[key] = b.search(`{{${key}}}`, { matchCase: true });
+            hfSearches[key].load("items");
+          }
+          await context.sync();
+
+          const rangeEntries = [];
+          for (const key of hfKeys) {
+            for (const range of hfSearches[key].items) {
+              const parentCC = range.parentContentControlOrNullObject;
+              parentCC.load("tag");
+              rangeEntries.push({ key, range, parentCC });
+            }
+          }
+          if (rangeEntries.length === 0) continue;
+          await context.sync();
+
+          let converted = false;
+          for (const { key, range, parentCC } of rangeEntries) {
+            const insideExisting = !parentCC.isNullObject &&
+              parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
+            if (!insideExisting) {
+              convertRangeToCC(range, key);
+              converted = true;
+              foundNew = true;
+            }
+          }
+          if (converted) await context.sync();
+        } catch (bodyErr) {
+          if (bodyErr.code !== "GeneralException") {
+            console.warn("DocFill: error scanning a header/footer:", bodyErr.message || bodyErr);
+          }
+        }
+      }
+    });
+
+    // If new HF fields were found, rescan to pick them up in the form
+    if (foundNew) scanDocument();
+  } catch {
+    // HF scan is best-effort; don't block the user
+  }
 }
 
 // ── Render Form ────────────────────────────────────────────────────────────────
