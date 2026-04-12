@@ -744,10 +744,14 @@ async function fillDocument() {
       }
       await context.sync();
 
-      // Update all CCs in one batch -- preserve content exactly as entered
+      // Update all CCs in one batch.
+      // Replace \n with \v (vertical tab = soft line break in Word) so
+      // multi-line text stays within the same paragraph and doesn't push
+      // surrounding inline text onto separate lines.
       for (const key of keys) {
+        const value = toFill[key].replace(/\n/g, "\v");
         for (const cc of ccCollections[key].items) {
-          cc.insertText(toFill[key], Word.InsertLocation.replace);
+          cc.insertText(value, Word.InsertLocation.replace);
         }
         totalReplaced += ccCollections[key].items.length;
       }
