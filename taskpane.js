@@ -227,68 +227,121 @@ async function scanDocument() {
       }
 
       // ── Phase B: Discover raw {{key}} text and convert to CCs ──
-      // Collect all body text to find placeholder keys via JS regex
-      const bodies = await getAllBodies(context);
-      let allText = "";
-      for (const b of bodies) b.load("text");
+      // Quick check: does the body text we already loaded contain any raw {{}} patterns?
+      // Body text was loaded in Phase A (allCCs sync also loaded body).
+      // Load main body text cheaply to check.
+      const mainBody = context.document.body;
+      mainBody.load("text");
       await context.sync();
-      for (const b of bodies) allText += " " + (b.text || "");
 
-      const rawMatches = allText.match(/\{\{(\w+)\}\}/g) || [];
-      // Search ALL keys found in text (not just new ones -- user may have added
-      // another {{client_name}} after an earlier scan)
-      const keysToSearch = [...new Set(rawMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+      const bodyText = mainBody.text || "";
+      const bodyMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
+      const keysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+
       let convertedAny = false;
 
-      if (keysToSearch.length > 0) {
-        // Search main body, then header/footer bodies sequentially.
-        // Sequential processing handles linked headers: once a placeholder is
-        // converted in one body, the linked copy no longer has raw text.
-        // After each body that finds results, sync so conversions take effect.
-        const mainBody = bodies[0]; // getAllBodies always returns document.body first
-        const hfBodies = bodies.slice(1).filter((b) => {
-          const t = b.text || "";
-          return keysToSearch.some((k) => t.includes(`{{${k}}}`));
-        });
+      // Convert raw placeholders in main body (one sync for search, one for parent checks, one for convert)
+      if (keysInBody.length > 0) {
+        const searches = {};
+        for (const key of keysInBody) {
+          searches[key] = mainBody.search(`{{${key}}}`, { matchCase: true });
+          searches[key].load("items");
+        }
+        await context.sync();
 
-        for (const b of [mainBody, ...hfBodies]) {
-          try {
-            const searches = {};
-            for (const key of keysToSearch) {
-              searches[key] = b.search(`{{${key}}}`, { matchCase: true });
-              searches[key].load("items");
+        // Batch parent-CC checks
+        const rangeEntries = [];
+        for (const key of keysInBody) {
+          for (const range of searches[key].items) {
+            const parentCC = range.parentContentControlOrNullObject;
+            parentCC.load("tag");
+            rangeEntries.push({ key, range, parentCC });
+          }
+        }
+        if (rangeEntries.length > 0) {
+          await context.sync();
+          for (const { key, range, parentCC } of rangeEntries) {
+            const insideExisting = !parentCC.isNullObject &&
+              parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
+            if (!insideExisting) {
+              if (!ccsByKey[key]) ccsByKey[key] = [];
+              convertRangeToCC(range, key);
+              convertedAny = true;
             }
-            await context.sync();
+          }
+          if (convertedAny) await context.sync();
+        }
+      }
 
-            // Collect all ranges and batch-check parent CCs in one sync
-            const rangeEntries = []; // { key, range, parentCC }
-            for (const key of keysToSearch) {
-              for (const range of searches[key].items) {
-                const parentCC = range.parentContentControlOrNullObject;
-                parentCC.load("tag");
-                rangeEntries.push({ key, range, parentCC });
-              }
-            }
-            if (rangeEntries.length === 0) continue;
-            await context.sync(); // single sync for all parent-CC checks
+      // Check headers/footers only if we haven't already found all keys.
+      // Load header/footer text to check for raw placeholders.
+      const sections = context.document.sections;
+      sections.load("items");
+      await context.sync();
 
-            let foundInBody = false;
-            for (const { key, range, parentCC } of rangeEntries) {
-              const insideExisting = !parentCC.isNullObject &&
-                parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
-              if (!insideExisting) {
-                if (!ccsByKey[key]) ccsByKey[key] = [];
-                convertRangeToCC(range, key);
-                foundInBody = true;
-                convertedAny = true;
-              }
+      const hfBodies = [];
+      for (const section of sections.items) {
+        for (const hfType of getHfTypes()) {
+          hfBodies.push(section.getHeader(hfType));
+          hfBodies.push(section.getFooter(hfType));
+        }
+      }
+      for (const b of hfBodies) b.load("text");
+      await context.sync();
+
+      // Filter to unique, non-empty HF bodies that contain raw placeholder text
+      const seenHfText = new Set();
+      const relevantHfBodies = [];
+      for (const b of hfBodies) {
+        const t = b.text && b.text.trim();
+        if (!t || seenHfText.has(t)) continue;
+        if (/\{\{\w+\}\}/.test(t)) {
+          seenHfText.add(t);
+          relevantHfBodies.push(b);
+        }
+      }
+
+      // Process relevant HF bodies sequentially (handles linked headers)
+      for (const b of relevantHfBodies) {
+        try {
+          const hfText = b.text || "";
+          const hfMatches = hfText.match(/\{\{(\w+)\}\}/g) || [];
+          const hfKeys = [...new Set(hfMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+          if (hfKeys.length === 0) continue;
+
+          const hfSearches = {};
+          for (const key of hfKeys) {
+            hfSearches[key] = b.search(`{{${key}}}`, { matchCase: true });
+            hfSearches[key].load("items");
+          }
+          await context.sync();
+
+          const hfRangeEntries = [];
+          for (const key of hfKeys) {
+            for (const range of hfSearches[key].items) {
+              const parentCC = range.parentContentControlOrNullObject;
+              parentCC.load("tag");
+              hfRangeEntries.push({ key, range, parentCC });
             }
-            // Sync after each body so linked copies see the conversion
-            if (foundInBody) await context.sync();
-          } catch (bodyErr) {
-            if (bodyErr.code !== "GeneralException") {
-              console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
+          }
+          if (hfRangeEntries.length === 0) continue;
+          await context.sync();
+
+          let foundInHf = false;
+          for (const { key, range, parentCC } of hfRangeEntries) {
+            const insideExisting = !parentCC.isNullObject &&
+              parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
+            if (!insideExisting) {
+              if (!ccsByKey[key]) ccsByKey[key] = [];
+              convertRangeToCC(range, key);
+              foundInHf = true;
+              convertedAny = true;
             }
+          }
+          if (foundInHf) await context.sync();
+        } catch (bodyErr) {
+          if (bodyErr.code !== "GeneralException") {
+            console.warn("DocFill: error scanning a header/footer:", bodyErr.message || bodyErr);
           }
         }
       }
