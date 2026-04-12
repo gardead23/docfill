@@ -715,48 +715,47 @@ async function fillDocument() {
     await Word.run(async (context) => {
       const keys = Object.keys(toFill);
 
-      // Batch-load all CC collections for all keys in one sync
+      // Batch-load all CC collections with text for all keys in one sync
       const ccCollections = {};
       for (const key of keys) {
         ccCollections[key] = context.document.contentControls.getByTag(keyToCCTag(key));
-        ccCollections[key].load("items");
+        ccCollections[key].load("items,text");
       }
       await context.sync();
 
-      // For paragraph-type fields with newlines, check if CC is inline.
-      // Load paragraph text for CCs that might get multi-line content.
+      // For paragraph-type fields with newlines, check each CC's inline status.
+      // Classification is per-CC, not per-key, since the same key can appear
+      // inline in one location and block-level in another.
       const paragraphFields = new Set(currentFields.filter((f) => f.type === "paragraph").map((f) => f.key));
-      const ccParaChecks = []; // { key, cc, para }
+      const inlineCCs = new WeakSet(); // tracks which CC instances are inline
+      const ccParaChecks = []; // { cc, para }
       for (const key of keys) {
         if (paragraphFields.has(key) && toFill[key].includes("\n")) {
           for (const cc of ccCollections[key].items) {
             const para = cc.getRange().paragraphs.getFirst();
             para.load("text");
-            ccParaChecks.push({ key, cc, para });
+            ccParaChecks.push({ cc, para });
           }
         }
       }
-      if (ccParaChecks.length > 0) await context.sync();
-
-      // Build set of inline CCs (paragraph has more text than just the CC)
-      const inlineCCKeys = new Set();
-      for (const { key, cc, para } of ccParaChecks) {
-        const paraText = (para.text || "").trim();
-        const ccText = (cc.text || "").trim();
-        // If paragraph text is longer than CC text, CC is inline with other content
-        if (paraText.length > ccText.length + 2) { // +2 for possible whitespace
-          inlineCCKeys.add(key);
+      if (ccParaChecks.length > 0) {
+        await context.sync();
+        for (const { cc, para } of ccParaChecks) {
+          const paraText = (para.text || "").trim();
+          const ccText = (cc.text || "").trim();
+          if (paraText.length > ccText.length + 2) {
+            inlineCCs.add(cc);
+          }
         }
       }
 
-      // Update all CCs in one batch
+      // Update all CCs in one batch, stripping newlines per-CC for inline ones
       for (const key of keys) {
-        let value = toFill[key];
-        // Strip newlines for inline paragraph CCs to prevent paragraph structure damage
-        if (inlineCCKeys.has(key)) {
-          value = value.replace(/[\r\n]+/g, " ").trim();
-        }
+        const rawValue = toFill[key];
         for (const cc of ccCollections[key].items) {
+          const value = inlineCCs.has(cc)
+            ? rawValue.replace(/[\r\n]+/g, " ").trim()
+            : rawValue;
           cc.insertText(value, Word.InsertLocation.replace);
         }
         totalReplaced += ccCollections[key].items.length;
