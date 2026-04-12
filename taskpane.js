@@ -766,6 +766,8 @@ async function fillDocument() {
 
     if (totalReplaced === 0) {
       // CCs may have been removed by Ctrl+Z or manual deletion. Auto-rescan.
+      btn.disabled = false;
+      btn.innerHTML = "Fill Document";
       showStatus("Fields not found in document. Rescanning...", "info");
       await scanDocument();
       return;
