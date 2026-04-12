@@ -260,26 +260,27 @@ async function scanDocument() {
             }
             await context.sync();
 
-            let foundInBody = false;
+            // Collect all ranges and batch-check parent CCs in one sync
+            const rangeEntries = []; // { key, range, parentCC }
             for (const key of keysToSearch) {
               for (const range of searches[key].items) {
-                // Check if this range is already inside a DocFill CC (skip it)
-                let insideExisting = false;
-                try {
-                  const parentCC = range.parentContentControlOrNullObject;
-                  parentCC.load("tag");
-                  await context.sync();
-                  if (!parentCC.isNullObject && parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX)) {
-                    insideExisting = true;
-                  }
-                } catch { /* no parent CC */ }
+                const parentCC = range.parentContentControlOrNullObject;
+                parentCC.load("tag");
+                rangeEntries.push({ key, range, parentCC });
+              }
+            }
+            if (rangeEntries.length === 0) continue;
+            await context.sync(); // single sync for all parent-CC checks
 
-                if (!insideExisting) {
-                  if (!ccsByKey[key]) ccsByKey[key] = [];
-                  convertRangeToCC(range, key);
-                  foundInBody = true;
-                  convertedAny = true;
-                }
+            let foundInBody = false;
+            for (const { key, range, parentCC } of rangeEntries) {
+              const insideExisting = !parentCC.isNullObject &&
+                parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
+              if (!insideExisting) {
+                if (!ccsByKey[key]) ccsByKey[key] = [];
+                convertRangeToCC(range, key);
+                foundInBody = true;
+                convertedAny = true;
               }
             }
             // Sync after each body so linked copies see the conversion
