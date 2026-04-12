@@ -346,8 +346,11 @@ async function scanDocument() {
   setScanButtonLoading(false);
 
   // ── Deferred HF scan: check headers/footers for raw placeholders ──
-  // Runs after the form is visible so the user isn't blocked.
-  scanHeaderFooters();
+  // Disable Fill while running so user can't fill before all fields are discovered.
+  const fillBtn = document.getElementById("fill-btn");
+  if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
+  await scanHeaderFooters();
+  if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
 }
 
 /** Scan headers/footers for raw {{key}} text and convert to CCs. Runs after main scan. */
@@ -448,13 +451,6 @@ async function scanHeaderFooters() {
           }
         }
 
-        // Merge draft values (user-typed but not yet filled)
-        for (const [key, val] of Object.entries(draftValues)) {
-          if (val.trim() && !lastFilledValues[key]) {
-            lastFilledValues[key] = val;
-          }
-        }
-
         hasFilled = Object.keys(lastFilledValues).length > 0;
         const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.includes(k));
         const brandNewKeys = allKeys.filter((k) => !currentFields.some((f) => f.key === k));
@@ -473,6 +469,14 @@ async function scanHeaderFooters() {
         });
         saveFieldConfigs(currentStorageKey, currentFields);
         renderForm(currentFields);
+
+        // Restore draft values (user-typed but not yet filled) into form inputs only
+        for (const [key, val] of Object.entries(draftValues)) {
+          if (!val.trim()) continue;
+          if (lastFilledValues[key]) continue; // already restored from CC
+          const el = document.getElementById(`val-${key}`);
+          if (el) el.value = val;
+        }
       });
     }
   } catch {
