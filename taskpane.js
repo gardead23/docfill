@@ -601,7 +601,8 @@ function onGlobalDateFormatChange(format) { setGlobalDateFormat(format); }
 function buildValueInput(field) {
   const id = `val-${field.key}`;
   if (field.type === "paragraph") {
-    return `<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea>`;
+    return `<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea>
+    <p class="field-hint">If this field is inline with other text, line breaks will be replaced with spaces.</p>`;
   }
   if (field.type === "date") {
     const globalFmt = getGlobalDateFormat();
@@ -1030,6 +1031,11 @@ function doFormClear() {
   document.querySelectorAll(".field-reset-btn").forEach((btn) => { btn.style.display = "none"; });
   lastFilledValues = {};
   hideStatus();
+  // Scroll back to top of form
+  const fieldsList = document.getElementById("fields-list");
+  if (fieldsList && fieldsList.firstElementChild) {
+    fieldsList.firstElementChild.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 // ── localStorage ───────────────────────────────────────────────────────────────

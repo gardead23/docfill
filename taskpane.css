@@ -348,6 +348,13 @@ main {
   resize: vertical;
 }
 
+.field-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
 /* ── Empty field highlight ── */
 .field-row.field-empty {
   box-shadow: 0 0 0 1.5px #f59e0b60, 0 1px 3px rgba(0,0,0,0.04);
