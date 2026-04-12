@@ -601,8 +601,7 @@ function onGlobalDateFormatChange(format) { setGlobalDateFormat(format); }
 function buildValueInput(field) {
   const id = `val-${field.key}`;
   if (field.type === "paragraph") {
-    return `<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea>
-    <p class="field-hint">If this field is inline with other text, line breaks will be replaced with spaces.</p>`;
+    return `<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea>`;
   }
   if (field.type === "date") {
     const globalFmt = getGlobalDateFormat();
@@ -737,48 +736,18 @@ async function fillDocument() {
     await Word.run(async (context) => {
       const keys = Object.keys(toFill);
 
-      // Batch-load all CC collections with text for all keys in one sync
+      // Batch-load all CC collections for all keys in one sync
       const ccCollections = {};
       for (const key of keys) {
         ccCollections[key] = context.document.contentControls.getByTag(keyToCCTag(key));
-        ccCollections[key].load("items,text");
+        ccCollections[key].load("items");
       }
       await context.sync();
 
-      // For paragraph-type fields with newlines, check each CC's inline status.
-      // Classification is per-CC, not per-key, since the same key can appear
-      // inline in one location and block-level in another.
-      const paragraphFields = new Set(currentFields.filter((f) => f.type === "paragraph").map((f) => f.key));
-      const inlineCCs = new WeakSet(); // tracks which CC instances are inline
-      const ccParaChecks = []; // { cc, para }
+      // Update all CCs in one batch -- preserve content exactly as entered
       for (const key of keys) {
-        if (paragraphFields.has(key) && toFill[key].includes("\n")) {
-          for (const cc of ccCollections[key].items) {
-            const para = cc.getRange().paragraphs.getFirst();
-            para.load("text");
-            ccParaChecks.push({ cc, para });
-          }
-        }
-      }
-      if (ccParaChecks.length > 0) {
-        await context.sync();
-        for (const { cc, para } of ccParaChecks) {
-          const paraText = (para.text || "").trim();
-          const ccText = (cc.text || "").trim();
-          if (paraText.length > ccText.length + 2) {
-            inlineCCs.add(cc);
-          }
-        }
-      }
-
-      // Update all CCs in one batch, stripping newlines per-CC for inline ones
-      for (const key of keys) {
-        const rawValue = toFill[key];
         for (const cc of ccCollections[key].items) {
-          const value = inlineCCs.has(cc)
-            ? rawValue.replace(/[\r\n]+/g, " ").trim()
-            : rawValue;
-          cc.insertText(value, Word.InsertLocation.replace);
+          cc.insertText(toFill[key], Word.InsertLocation.replace);
         }
         totalReplaced += ccCollections[key].items.length;
       }
