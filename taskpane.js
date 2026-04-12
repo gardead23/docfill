@@ -245,30 +245,59 @@ async function scanDocument() {
       let convertedAny = false;
 
       if (newKeys.length > 0) {
-        // Search for each new key's text pattern across bodies and convert to CCs
-        for (const b of bodies) {
-          try {
-            const searches = {};
-            for (const key of newKeys) {
-              searches[key] = b.search(`{{${key}}}`, { matchCase: true });
-              searches[key].load("items");
-            }
-            await context.sync();
+        // Skip bodies that don't contain any placeholder text (avoids unnecessary syncs)
+        const relevantBodies = bodies.filter((b) => {
+          const t = b.text || "";
+          return newKeys.some((k) => t.includes(`{{${k}}}`));
+        });
 
-            for (const key of newKeys) {
-              for (const range of searches[key].items) {
-                if (!ccsByKey[key]) ccsByKey[key] = [];
-                convertRangeToCC(range, key);
-                convertedAny = true;
+        // Search only the main body (index 0) -- linked headers share content,
+        // so searching just the primary body + unique header/footer bodies is enough.
+        // Use document.body.search which covers inline text reliably.
+        const mainBody = context.document.body;
+        const searches = {};
+        for (const key of newKeys) {
+          searches[key] = mainBody.search(`{{${key}}}`, { matchCase: true });
+          searches[key].load("items");
+        }
+        await context.sync();
+
+        for (const key of newKeys) {
+          for (const range of searches[key].items) {
+            if (!ccsByKey[key]) ccsByKey[key] = [];
+            convertRangeToCC(range, key);
+            convertedAny = true;
+          }
+        }
+
+        // Now search header/footer bodies (only relevant ones)
+        const hfBodies = relevantBodies.filter((b) => b !== context.document.body);
+        if (hfBodies.length > 0) {
+          for (const b of hfBodies) {
+            try {
+              const hfSearches = {};
+              for (const key of newKeys) {
+                hfSearches[key] = b.search(`{{${key}}}`, { matchCase: true });
+                hfSearches[key].load("items");
               }
-            }
-            if (convertedAny) await context.sync();
-          } catch (bodyErr) {
-            if (bodyErr.code !== "GeneralException") {
-              console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
+              await context.sync();
+
+              for (const key of newKeys) {
+                for (const range of hfSearches[key].items) {
+                  if (!ccsByKey[key]) ccsByKey[key] = [];
+                  convertRangeToCC(range, key);
+                  convertedAny = true;
+                }
+              }
+            } catch (bodyErr) {
+              if (bodyErr.code !== "GeneralException") {
+                console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
+              }
             }
           }
         }
+
+        if (convertedAny) await context.sync();
       }
 
       // Reload CCs after conversion
