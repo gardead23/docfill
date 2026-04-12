@@ -227,35 +227,49 @@ async function scanDocument() {
       }
 
       // ── Phase B: Discover raw {{key}} text and convert to CCs ──
+      // First, collect all body text to find placeholder keys via JS regex
       const bodies = await getAllBodies(context);
-      const rawKeys = new Set();
+      let allText = "";
+      for (const b of bodies) {
+        b.load("text");
+      }
+      await context.sync();
+      for (const b of bodies) {
+        allText += " " + (b.text || "");
+      }
+      const rawMatches = allText.match(/\{\{(\w+)\}\}/g) || [];
+      const rawKeys = [...new Set(rawMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+
+      // Filter to keys that don't already have DocFill CCs
+      const newKeys = rawKeys.filter((k) => !ccsByKey[k]);
       let convertedAny = false;
 
-      for (const b of bodies) {
-        try {
-          // Search for all {{placeholder}} patterns in this body
-          const results = b.search("{{*}}", { matchWildcards: true });
-          results.load("items,text");
-          await context.sync();
+      if (newKeys.length > 0) {
+        // Search for each new key's text pattern across bodies and convert to CCs
+        for (const b of bodies) {
+          try {
+            const searches = {};
+            for (const key of newKeys) {
+              searches[key] = b.search(`{{${key}}}`, { matchCase: true });
+              searches[key].load("items");
+            }
+            await context.sync();
 
-          for (const range of results.items) {
-            const m = range.text.match(/^\{\{(\w+)\}\}$/);
-            if (!m) continue;
-            const key = m[1];
-            rawKeys.add(key);
-
-            // Only convert if no DocFill CC exists for this key in this range
-            if (!ccsByKey[key]) ccsByKey[key] = [];
-            convertRangeToCC(range, key);
-            convertedAny = true;
-          }
-        } catch (bodyErr) {
-          if (bodyErr.code !== "GeneralException") {
-            console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
+            for (const key of newKeys) {
+              for (const range of searches[key].items) {
+                if (!ccsByKey[key]) ccsByKey[key] = [];
+                convertRangeToCC(range, key);
+                convertedAny = true;
+              }
+            }
+            if (convertedAny) await context.sync();
+          } catch (bodyErr) {
+            if (bodyErr.code !== "GeneralException") {
+              console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
+            }
           }
         }
       }
-      if (convertedAny) await context.sync();
 
       // Reload CCs after conversion
       allCCs.load("items,tag,text");
