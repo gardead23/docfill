@@ -307,8 +307,7 @@ async function scanDocument() {
         document.querySelector(".empty-desc").innerHTML =
           'No <code>{{placeholders}}</code> found. Add fields like <code>{{client_name}}</code> to your document, then scan again.';
         setScanButtonLoading(false);
-        scanInProgress = false;
-        return;
+        return; // scanInProgress cleared in outer finally
       }
 
       // Hydrate lastFilledValues from CCs
@@ -352,11 +351,14 @@ async function scanDocument() {
 
   // ── Deferred HF scan: check headers/footers for raw placeholders ──
   // Disable Fill while running so user can't fill before all fields are discovered.
-  const fillBtn = document.getElementById("fill-btn");
-  if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
-  await scanHeaderFooters();
-  if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
-  scanInProgress = false;
+  try {
+    const fillBtn = document.getElementById("fill-btn");
+    if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
+    await scanHeaderFooters();
+    if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+  } finally {
+    scanInProgress = false;
+  }
 }
 
 /** Scan headers/footers for raw {{key}} text and convert to CCs. Runs after main scan. */
@@ -760,11 +762,10 @@ async function fillDocument() {
   btn.innerHTML = "Fill Document";
 }
 
-/** Collect raw draft values from the form, preserving date select states. */
+/** Collect raw draft values from ALL visible form fields, including already-filled ones the user may have edited. */
 function collectRawDrafts() {
   const drafts = {};
   currentFields.forEach((field) => {
-    if (lastFilledValues[field.key]) return; // already filled, skip
     if (field.type === "date") {
       const container = document.getElementById(`val-${field.key}`);
       if (container) {
@@ -782,10 +783,9 @@ function collectRawDrafts() {
   return drafts;
 }
 
-/** Restore raw draft values into form inputs after a rerender. */
+/** Restore raw draft values into form inputs after a rerender. Overrides CC-hydrated values since drafts represent user edits. */
 function restoreRawDrafts(drafts) {
   for (const [key, draft] of Object.entries(drafts)) {
-    if (lastFilledValues[key]) continue; // already restored from CC
     if (draft.type === "date") {
       const container = document.getElementById(`val-${key}`);
       if (container) {
