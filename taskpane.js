@@ -248,7 +248,11 @@ async function scanDocument() {
 
       const bodyText = mainBody.text || "";
       const bodyMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      const keysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+      const allKeysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+      // Only count keys that are NOT already covered by existing CCs.
+      // Body text includes CC display text (e.g. {{key}} inside a reset CC),
+      // so without this filter, keysFoundInBody would always be true after reset.
+      const keysInBody = allKeysInBody.filter((k) => !ccsByKey[k]);
       keysFoundInBody = keysInBody.length > 0;
 
       let convertedAny = false;
