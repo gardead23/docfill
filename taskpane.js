@@ -765,7 +765,10 @@ async function fillDocument() {
     });
 
     if (totalReplaced === 0) {
-      showStatus("No fields found. Try scanning the document first.", "error");
+      // CCs may have been removed by Ctrl+Z or manual deletion. Auto-rescan.
+      showStatus("Fields not found in document. Rescanning...", "info");
+      await scanDocument();
+      return;
     } else {
       hasFilled = true;
       Object.assign(lastFilledValues, toFill);
