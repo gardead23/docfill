@@ -274,14 +274,27 @@ async function scanDocument() {
       }
 
       // Check headers/footers for raw placeholders.
-      // Skip entirely if DocFill CCs already existed before this scan AND the body
-      // had no new raw placeholders. This makes rescan near-instant on large documents.
-      const hadExistingCCs = Object.keys(ccsByKey).length > 0;
-      const bodyHadRawPlaceholders = keysInBody.length > 0;
-      const needHfScan = !hadExistingCCs || bodyHadRawPlaceholders;
-
-      if (needHfScan) {
+      // Cheap pre-check: load only the first section's HF bodies (6 objects max).
+      // Linked headers share content with the first section, so if the first section's
+      // headers have no raw {{}} text, no linked copies will either.
+      // Only enumerate all sections if the pre-check finds raw placeholders.
       const hfSections = context.document.sections;
+      const firstSection = hfSections.getFirst();
+      const probeHfBodies = [];
+      for (const hfType of getHfTypes()) {
+        probeHfBodies.push(firstSection.getHeader(hfType));
+        probeHfBodies.push(firstSection.getFooter(hfType));
+      }
+      for (const b of probeHfBodies) b.load("text");
+      await context.sync();
+
+      const anyHfHasRaw = probeHfBodies.some((b) => {
+        const t = b.text && b.text.trim();
+        return t && /\{\{\w+\}\}/.test(t);
+      });
+
+      if (anyHfHasRaw) {
+      // Full HF scan: enumerate all sections
       hfSections.load("items");
       await context.sync();
 
@@ -343,7 +356,7 @@ async function scanDocument() {
           }
         }
       }
-      } // end needHfScan
+      } // end anyHfHasRaw
 
       // Reload CCs after conversion
       allCCs.load("items,tag,text");
