@@ -199,7 +199,11 @@ function convertRangeToCC(range, key) {
 
 // ── Scan Document ──────────────────────────────────────────────────────────────
 
+let scanInProgress = false;
+
 async function scanDocument() {
+  if (scanInProgress) return;
+  scanInProgress = true;
   showStatus("Scanning document...", "info");
   setScanButtonLoading(true);
 
@@ -303,6 +307,7 @@ async function scanDocument() {
         document.querySelector(".empty-desc").innerHTML =
           'No <code>{{placeholders}}</code> found. Add fields like <code>{{client_name}}</code> to your document, then scan again.';
         setScanButtonLoading(false);
+        scanInProgress = false;
         return;
       }
 
@@ -351,6 +356,7 @@ async function scanDocument() {
   if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
   await scanHeaderFooters();
   if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+  scanInProgress = false;
 }
 
 /** Scan headers/footers for raw {{key}} text and convert to CCs. Runs after main scan. */
@@ -425,8 +431,8 @@ async function scanHeaderFooters() {
     });
 
     if (foundNew) {
-      // Preserve any draft values the user typed before rerendering
-      const draftValues = collectValues();
+      // Preserve raw draft values (including date select states) before rerendering
+      const draftValues = collectRawDrafts();
 
       // Reload CCs to pick up newly converted HF fields
       await Word.run(async (context) => {
@@ -471,12 +477,7 @@ async function scanHeaderFooters() {
         renderForm(currentFields);
 
         // Restore draft values (user-typed but not yet filled) into form inputs only
-        for (const [key, val] of Object.entries(draftValues)) {
-          if (!val.trim()) continue;
-          if (lastFilledValues[key]) continue; // already restored from CC
-          const el = document.getElementById(`val-${key}`);
-          if (el) el.value = val;
-        }
+        restoreRawDrafts(draftValues);
       });
     }
   } catch {
@@ -757,6 +758,50 @@ async function fillDocument() {
 
   btn.disabled = false;
   btn.innerHTML = "Fill Document";
+}
+
+/** Collect raw draft values from the form, preserving date select states. */
+function collectRawDrafts() {
+  const drafts = {};
+  currentFields.forEach((field) => {
+    if (lastFilledValues[field.key]) return; // already filled, skip
+    if (field.type === "date") {
+      const container = document.getElementById(`val-${field.key}`);
+      if (container) {
+        const m = container.querySelector(".date-month")?.value || "";
+        const d = container.querySelector(".date-day")?.value || "";
+        const y = container.querySelector(".date-year")?.value || "";
+        if (m || d || y) drafts[field.key] = { type: "date", month: m, day: d, year: y };
+      }
+    } else {
+      const el = document.getElementById(`val-${field.key}`);
+      const val = el ? el.value : "";
+      if (val.trim()) drafts[field.key] = { type: "text", value: val };
+    }
+  });
+  return drafts;
+}
+
+/** Restore raw draft values into form inputs after a rerender. */
+function restoreRawDrafts(drafts) {
+  for (const [key, draft] of Object.entries(drafts)) {
+    if (lastFilledValues[key]) continue; // already restored from CC
+    if (draft.type === "date") {
+      const container = document.getElementById(`val-${key}`);
+      if (container) {
+        const monthSel = container.querySelector(".date-month");
+        const daySel = container.querySelector(".date-day");
+        const yearSel = container.querySelector(".date-year");
+        if (monthSel) monthSel.value = draft.month;
+        if (yearSel) yearSel.value = draft.year;
+        if (draft.month || draft.year) updateDayOptions(key);
+        if (daySel) daySel.value = draft.day;
+      }
+    } else {
+      const el = document.getElementById(`val-${key}`);
+      if (el) el.value = draft.value;
+    }
+  }
 }
 
 function collectValues() {
