@@ -70,6 +70,8 @@ const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
 let lastSelectedOccurrenceIndex = -1;
+/** True while background HF scan is running */
+let hfScanInProgress = false;
 
 // ── Document Range Helpers ────────────────────────────────────────────────────
 
@@ -348,8 +350,9 @@ async function scanDocument() {
   scanHeaderFooters();
 }
 
-/** Scan headers/footers for raw {{key}} text and convert to CCs. Runs in background after main scan. */
+/** Scan headers/footers for raw {{key}} text and convert to CCs. Runs after main scan. */
 async function scanHeaderFooters() {
+  hfScanInProgress = true;
   try {
     let foundNew = false;
     await Word.run(async (context) => {
@@ -418,10 +421,64 @@ async function scanHeaderFooters() {
       }
     });
 
-    // If new HF fields were found, rescan to pick them up in the form
-    if (foundNew) scanDocument();
+    if (foundNew) {
+      // Preserve any draft values the user typed before rerendering
+      const draftValues = collectValues();
+
+      // Reload CCs to pick up newly converted HF fields
+      await Word.run(async (context) => {
+        const allCCs = context.document.contentControls;
+        allCCs.load("items,tag,text");
+        await context.sync();
+
+        const ccMap = {};
+        for (const cc of allCCs.items) {
+          if (!isDocFillCC(cc)) continue;
+          const key = ccTagToKey(cc.tag);
+          if (!ccMap[key]) ccMap[key] = { items: [], text: cc.text };
+          ccMap[key].items.push(cc);
+        }
+
+        const allKeys = Object.keys(ccMap);
+        // Hydrate filled values
+        for (const [key, data] of Object.entries(ccMap)) {
+          const text = data.text.trim();
+          if (text && text !== `{{${key}}}`) {
+            lastFilledValues[key] = data.text;
+          }
+        }
+
+        // Merge draft values (user-typed but not yet filled)
+        for (const [key, val] of Object.entries(draftValues)) {
+          if (val.trim() && !lastFilledValues[key]) {
+            lastFilledValues[key] = val;
+          }
+        }
+
+        hasFilled = Object.keys(lastFilledValues).length > 0;
+        const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.includes(k));
+        const brandNewKeys = allKeys.filter((k) => !currentFields.some((f) => f.key === k));
+        const keys = [...orderedExisting, ...brandNewKeys];
+
+        currentStorageKey = buildStorageKey(keys);
+        const saved = loadFieldConfigsWithMigration(currentStorageKey, keys);
+        currentFields = keys.map((key) => {
+          const savedType = saved[key]?.type === "number" ? "text" : saved[key]?.type;
+          return {
+            key,
+            label: saved[key]?.label || toTitleCase(key),
+            type: savedType || guessFieldType(key),
+            dateFormat: saved[key]?.dateFormat,
+          };
+        });
+        saveFieldConfigs(currentStorageKey, currentFields);
+        renderForm(currentFields);
+      });
+    }
   } catch {
-    // HF scan is best-effort; don't block the user
+    // HF scan is best-effort
+  } finally {
+    hfScanInProgress = false;
   }
 }
 
@@ -882,26 +939,9 @@ async function computeDocumentFingerprint() {
       body.load("text");
       const allCCs = context.document.contentControls;
       allCCs.load("items,tag,text");
-      const sections = context.document.sections;
-      sections.load("items");
-      await context.sync();
-
-      const hfBodies = [];
-      for (const section of sections.items) {
-        for (const hfType of getHfTypes()) {
-          const h = section.getHeader(hfType);
-          const f = section.getFooter(hfType);
-          h.load("text");
-          f.load("text");
-          hfBodies.push(h, f);
-        }
-      }
       await context.sync();
 
       let raw = body.text || "";
-      for (const hf of hfBodies) {
-        if (hf.text && hf.text.trim()) raw += " " + hf.text;
-      }
 
       // Strip DocFill CC text and placeholder patterns for stability
       for (const cc of allCCs.items) {
