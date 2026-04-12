@@ -369,13 +369,11 @@ async function scanDocument() {
   // - Body had raw placeholders (template just imported, HF likely has them too)
   // On rescan with existing CCs and no new body placeholders, HF is skipped
   // because persistent CCs already cover all fields including headers.
-  const needsHfScan = !hadExistingCCs || keysFoundInBody;
   try {
-    if (needsHfScan) {
-      const fillBtn = document.getElementById("fill-btn");
-      if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Scanning headers..."; }
-      await scanHeaderFooters();
-      if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+    if (!hadExistingCCs || keysFoundInBody) {
+      // HF scan needed -- run it but don't block Fill.
+      // User can fill body fields immediately; HF fields appear when ready.
+      scanHeaderFooters();
     }
   } finally {
     scanInProgress = false;
