@@ -723,10 +723,41 @@ async function fillDocument() {
       }
       await context.sync();
 
+      // For paragraph-type fields with newlines, check if CC is inline.
+      // Load paragraph text for CCs that might get multi-line content.
+      const paragraphFields = new Set(currentFields.filter((f) => f.type === "paragraph").map((f) => f.key));
+      const ccParaChecks = []; // { key, cc, para }
+      for (const key of keys) {
+        if (paragraphFields.has(key) && toFill[key].includes("\n")) {
+          for (const cc of ccCollections[key].items) {
+            const para = cc.getRange().paragraphs.getFirst();
+            para.load("text");
+            ccParaChecks.push({ key, cc, para });
+          }
+        }
+      }
+      if (ccParaChecks.length > 0) await context.sync();
+
+      // Build set of inline CCs (paragraph has more text than just the CC)
+      const inlineCCKeys = new Set();
+      for (const { key, cc, para } of ccParaChecks) {
+        const paraText = (para.text || "").trim();
+        const ccText = (cc.text || "").trim();
+        // If paragraph text is longer than CC text, CC is inline with other content
+        if (paraText.length > ccText.length + 2) { // +2 for possible whitespace
+          inlineCCKeys.add(key);
+        }
+      }
+
       // Update all CCs in one batch
       for (const key of keys) {
+        let value = toFill[key];
+        // Strip newlines for inline paragraph CCs to prevent paragraph structure damage
+        if (inlineCCKeys.has(key)) {
+          value = value.replace(/[\r\n]+/g, " ").trim();
+        }
         for (const cc of ccCollections[key].items) {
-          cc.insertText(toFill[key], Word.InsertLocation.replace);
+          cc.insertText(value, Word.InsertLocation.replace);
         }
         totalReplaced += ccCollections[key].items.length;
       }
