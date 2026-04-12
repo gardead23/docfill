@@ -227,77 +227,69 @@ async function scanDocument() {
       }
 
       // ── Phase B: Discover raw {{key}} text and convert to CCs ──
-      // First, collect all body text to find placeholder keys via JS regex
+      // Collect all body text to find placeholder keys via JS regex
       const bodies = await getAllBodies(context);
       let allText = "";
-      for (const b of bodies) {
-        b.load("text");
-      }
+      for (const b of bodies) b.load("text");
       await context.sync();
-      for (const b of bodies) {
-        allText += " " + (b.text || "");
-      }
-      const rawMatches = allText.match(/\{\{(\w+)\}\}/g) || [];
-      const rawKeys = [...new Set(rawMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+      for (const b of bodies) allText += " " + (b.text || "");
 
-      // Filter to keys that don't already have DocFill CCs
-      const newKeys = rawKeys.filter((k) => !ccsByKey[k]);
+      const rawMatches = allText.match(/\{\{(\w+)\}\}/g) || [];
+      // Search ALL keys found in text (not just new ones -- user may have added
+      // another {{client_name}} after an earlier scan)
+      const keysToSearch = [...new Set(rawMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
       let convertedAny = false;
 
-      if (newKeys.length > 0) {
-        // Skip bodies that don't contain any placeholder text (avoids unnecessary syncs)
-        const relevantBodies = bodies.filter((b) => {
+      if (keysToSearch.length > 0) {
+        // Search main body, then header/footer bodies sequentially.
+        // Sequential processing handles linked headers: once a placeholder is
+        // converted in one body, the linked copy no longer has raw text.
+        // After each body that finds results, sync so conversions take effect.
+        const mainBody = bodies[0]; // getAllBodies always returns document.body first
+        const hfBodies = bodies.slice(1).filter((b) => {
           const t = b.text || "";
-          return newKeys.some((k) => t.includes(`{{${k}}}`));
+          return keysToSearch.some((k) => t.includes(`{{${k}}}`));
         });
 
-        // Search only the main body (index 0) -- linked headers share content,
-        // so searching just the primary body + unique header/footer bodies is enough.
-        // Use document.body.search which covers inline text reliably.
-        const mainBody = context.document.body;
-        const searches = {};
-        for (const key of newKeys) {
-          searches[key] = mainBody.search(`{{${key}}}`, { matchCase: true });
-          searches[key].load("items");
-        }
-        await context.sync();
+        for (const b of [mainBody, ...hfBodies]) {
+          try {
+            const searches = {};
+            for (const key of keysToSearch) {
+              searches[key] = b.search(`{{${key}}}`, { matchCase: true });
+              searches[key].load("items");
+            }
+            await context.sync();
 
-        for (const key of newKeys) {
-          for (const range of searches[key].items) {
-            if (!ccsByKey[key]) ccsByKey[key] = [];
-            convertRangeToCC(range, key);
-            convertedAny = true;
-          }
-        }
+            let foundInBody = false;
+            for (const key of keysToSearch) {
+              for (const range of searches[key].items) {
+                // Check if this range is already inside a DocFill CC (skip it)
+                let insideExisting = false;
+                try {
+                  const parentCC = range.parentContentControlOrNullObject;
+                  parentCC.load("tag");
+                  await context.sync();
+                  if (!parentCC.isNullObject && parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX)) {
+                    insideExisting = true;
+                  }
+                } catch { /* no parent CC */ }
 
-        // Now search header/footer bodies (only relevant ones)
-        const hfBodies = relevantBodies.filter((b) => b !== context.document.body);
-        if (hfBodies.length > 0) {
-          for (const b of hfBodies) {
-            try {
-              const hfSearches = {};
-              for (const key of newKeys) {
-                hfSearches[key] = b.search(`{{${key}}}`, { matchCase: true });
-                hfSearches[key].load("items");
-              }
-              await context.sync();
-
-              for (const key of newKeys) {
-                for (const range of hfSearches[key].items) {
+                if (!insideExisting) {
                   if (!ccsByKey[key]) ccsByKey[key] = [];
                   convertRangeToCC(range, key);
+                  foundInBody = true;
                   convertedAny = true;
                 }
               }
-            } catch (bodyErr) {
-              if (bodyErr.code !== "GeneralException") {
-                console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
-              }
+            }
+            // Sync after each body so linked copies see the conversion
+            if (foundInBody) await context.sync();
+          } catch (bodyErr) {
+            if (bodyErr.code !== "GeneralException") {
+              console.warn("DocFill: error scanning a region:", bodyErr.message || bodyErr);
             }
           }
         }
-
-        if (convertedAny) await context.sync();
       }
 
       // Reload CCs after conversion
@@ -1115,6 +1107,7 @@ async function confirmReplace(replaceAll) {
 
   try {
     let count = 0;
+    let createSkipped = 0;
     await Word.run(async (context) => {
       if (replaceAll) {
         const bodies = await getAllBodies(context);
@@ -1136,7 +1129,10 @@ async function confirmReplace(replaceAll) {
               await context.sync();
             }
           } catch (bodyErr) {
-            if (bodyErr.code !== "GeneralException") {
+            if (bodyErr.code === "GeneralException") {
+              // Linked header already modified -- expected
+            } else {
+              createSkipped++;
               console.warn("DocFill: error in create:", bodyErr.message || bodyErr);
             }
           }
@@ -1156,7 +1152,15 @@ async function confirmReplace(replaceAll) {
         await context.sync();
       }
     });
-    if (count > 0) onPlaceholderCreated(name, count);
+    if (count > 0) {
+      onPlaceholderCreated(name, count);
+      if (createSkipped > 0) {
+        showCreateStatus(
+          `Created {{${name}}} but ${createSkipped} region${createSkipped > 1 ? "s were" : " was"} skipped.`,
+          "info"
+        );
+      }
+    }
   } catch (err) {
     showCreateStatus("Error: " + err.message, "error");
   }
