@@ -273,14 +273,14 @@ async function scanDocument() {
         }
       }
 
-      // Check headers/footers only if we haven't already found all keys.
-      // Load header/footer text to check for raw placeholders.
-      const sections = context.document.sections;
-      sections.load("items");
+      // Check headers/footers for raw placeholders.
+      // Load sections and HF bodies, filter to those with raw {{}} text.
+      const hfSections = context.document.sections;
+      hfSections.load("items");
       await context.sync();
 
       const hfBodies = [];
-      for (const section of sections.items) {
+      for (const section of hfSections.items) {
         for (const hfType of getHfTypes()) {
           hfBodies.push(section.getHeader(hfType));
           hfBodies.push(section.getFooter(hfType));
@@ -289,19 +289,13 @@ async function scanDocument() {
       for (const b of hfBodies) b.load("text");
       await context.sync();
 
-      // Filter to unique, non-empty HF bodies that contain raw placeholder text
-      const seenHfText = new Set();
-      const relevantHfBodies = [];
-      for (const b of hfBodies) {
+      // No text-dedup -- two unlinked regions with identical text both get processed.
+      // Sequential processing + parent-CC skip handles linked headers correctly.
+      const relevantHfBodies = hfBodies.filter((b) => {
         const t = b.text && b.text.trim();
-        if (!t || seenHfText.has(t)) continue;
-        if (/\{\{\w+\}\}/.test(t)) {
-          seenHfText.add(t);
-          relevantHfBodies.push(b);
-        }
-      }
+        return t && /\{\{\w+\}\}/.test(t);
+      });
 
-      // Process relevant HF bodies sequentially (handles linked headers)
       for (const b of relevantHfBodies) {
         try {
           const hfText = b.text || "";
