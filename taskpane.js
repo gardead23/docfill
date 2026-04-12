@@ -274,7 +274,13 @@ async function scanDocument() {
       }
 
       // Check headers/footers for raw placeholders.
-      // Load sections and HF bodies, filter to those with raw {{}} text.
+      // Skip entirely if DocFill CCs already existed before this scan AND the body
+      // had no new raw placeholders. This makes rescan near-instant on large documents.
+      const hadExistingCCs = Object.keys(ccsByKey).length > 0;
+      const bodyHadRawPlaceholders = keysInBody.length > 0;
+      const needHfScan = !hadExistingCCs || bodyHadRawPlaceholders;
+
+      if (needHfScan) {
       const hfSections = context.document.sections;
       hfSections.load("items");
       await context.sync();
@@ -289,8 +295,6 @@ async function scanDocument() {
       for (const b of hfBodies) b.load("text");
       await context.sync();
 
-      // No text-dedup -- two unlinked regions with identical text both get processed.
-      // Sequential processing + parent-CC skip handles linked headers correctly.
       const relevantHfBodies = hfBodies.filter((b) => {
         const t = b.text && b.text.trim();
         return t && /\{\{\w+\}\}/.test(t);
@@ -339,6 +343,7 @@ async function scanDocument() {
           }
         }
       }
+      } // end needHfScan
 
       // Reload CCs after conversion
       allCCs.load("items,tag,text");
