@@ -206,7 +206,6 @@ async function scanDocument() {
   scanInProgress = true;
   setScanButtonLoading(true);
 
-  let keysFoundInBody = false;
   let hadExistingCCs = false;
 
   try {
@@ -247,16 +246,13 @@ async function scanDocument() {
 
       const bodyText = mainBody.text || "";
       const bodyMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      const allKeysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
-      // Only count keys that are NOT already covered by existing CCs.
-      // Body text includes CC display text (e.g. {{key}} inside a reset CC),
-      // so without this filter, keysFoundInBody would always be true after reset.
-      const keysInBody = allKeysInBody.filter((k) => !ccsByKey[k]);
-      keysFoundInBody = keysInBody.length > 0;
+      // Search ALL keys found in body text -- a key may already have CCs but
+      // the user could have added a new raw occurrence of the same key.
+      // Per-range parent-CC check handles dedup (skips ranges inside existing CCs).
+      const keysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
 
       let convertedAny = false;
 
-      // Convert raw placeholders in main body (one sync for search, one for parent checks, one for convert)
       if (keysInBody.length > 0) {
         const searches = {};
         for (const key of keysInBody) {
@@ -364,27 +360,20 @@ async function scanDocument() {
 
   setScanButtonLoading(false);
 
-  // ── Deferred HF scan: only needed on first scan or when body had raw placeholders ──
-  // On rescan (CCs already exist), HF fields are already covered by persistent CCs.
-  // The user can add new HF placeholders and click Rescan -- the body scan will
-  // recreate scanInProgress=false and this block runs again.
-  // HF scan needed when:
-  // - No CCs existed before scan (fresh template, might have HF-only placeholders)
-  // - Body had raw placeholders (template just imported, HF likely has them too)
-  // On rescan with existing CCs and no new body placeholders, HF is skipped
-  // because persistent CCs already cover all fields including headers.
+  // ── Deferred HF scan: always check for new HF placeholders ──
+  // The text-load is cheap; only bodies with raw {{}} are processed further.
   try {
-    if (!hadExistingCCs || keysFoundInBody) {
-      // HF scan needed -- run in background with top-of-form status
-      const hfStatusEl = document.getElementById("hf-status");
-      if (hfStatusEl) {
-        hfStatusEl.innerHTML = '<span class="spinner-small"></span> Start filling below. Document is finishing setup -- you may notice cursor flickering for a few seconds.';
-        hfStatusEl.style.display = "flex";
-      }
-      scanHeaderFooters().then(() => {
-        if (hfStatusEl) hfStatusEl.style.display = "none";
-      });
+    const hfStatusEl = document.getElementById("hf-status");
+    const fillBtn = document.getElementById("fill-btn");
+    if (hfStatusEl) {
+      hfStatusEl.innerHTML = '<span class="spinner-small"></span> Start filling below. Document is finishing setup -- you may notice cursor flickering for a few seconds.';
+      hfStatusEl.style.display = "flex";
     }
+    if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Finishing setup..."; }
+    scanHeaderFooters().then(() => {
+      if (hfStatusEl) hfStatusEl.style.display = "none";
+      if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+    });
   } finally {
     scanInProgress = false;
   }
@@ -1348,13 +1337,11 @@ async function confirmReplace(replaceAll) {
     let createSkipped = 0;
     await Word.run(async (context) => {
       if (replaceAll) {
-        // Search main body with one sync, then batch all replacements
-        const mainBody = context.document.body;
-        const results = mainBody.search(text, { matchCase: true });
-        results.load("items");
-        await context.sync();
+        // Search all bodies and dedupe linked ranges, then batch replacements
+        const rawItems = await searchAllBodies(context, text, { matchCase: true });
+        const items = await dedupeRanges(context, rawItems);
 
-        for (const range of results.items) {
+        for (const range of items) {
           const cc = range.insertContentControl();
           cc.tag = keyToCCTag(name);
           cc.title = toTitleCase(name);
@@ -1362,7 +1349,7 @@ async function confirmReplace(replaceAll) {
           cc.placeholderText = `{{${name}}}`;
           cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         }
-        count += results.items.length;
+        count += items.length;
         if (count > 0) await context.sync();
       } else {
         const rawItems = await searchAllBodies(context, text, { matchCase: true });
