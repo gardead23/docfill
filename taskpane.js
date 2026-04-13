@@ -1125,8 +1125,12 @@ function switchTab(tab) {
   if (tab === "create") {
     document.getElementById("actions").style.display = "none";
     fetchCurrentSelection();
-  } else if (tab === "fill" && currentFields.length > 0) {
-    document.getElementById("actions").style.display = "flex";
+  } else if (tab === "fill") {
+    if (currentFields.length > 0) {
+      document.getElementById("actions").style.display = "flex";
+    }
+    // Auto-rescan to pick up any new placeholders added since last scan
+    scanDocument();
   }
 }
 
