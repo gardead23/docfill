@@ -352,6 +352,12 @@ async function scanDocument() {
       saveFieldConfigs(currentStorageKey, currentFields);
       renderForm(currentFields);
       hideStatus();
+
+      // Scroll to top of form after scan
+      const fieldsList = document.getElementById("fields-list");
+      if (fieldsList && fieldsList.firstElementChild) {
+        fieldsList.firstElementChild.scrollIntoView({ behavior: "instant", block: "start" });
+      }
     });
   } catch (err) {
     showStatus("Error reading document: " + err.message, "error");
@@ -370,9 +376,12 @@ async function scanDocument() {
   // because persistent CCs already cover all fields including headers.
   try {
     if (!hadExistingCCs || keysFoundInBody) {
-      // HF scan needed -- run it but don't block Fill.
-      // User can fill body fields immediately; HF fields appear when ready.
-      scanHeaderFooters();
+      // HF scan needed -- run in background but show status so user knows
+      // the document may be briefly unresponsive.
+      showStatus("Scanning headers and footers...", "info");
+      scanHeaderFooters().then(() => {
+        hideStatus();
+      });
     }
   } finally {
     scanInProgress = false;
