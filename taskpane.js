@@ -353,10 +353,10 @@ async function scanDocument() {
       renderForm(currentFields);
       hideStatus();
 
-      // Scroll to top of form after scan
-      const fieldsList = document.getElementById("fields-list");
-      if (fieldsList && fieldsList.firstElementChild) {
-        fieldsList.firstElementChild.scrollIntoView({ behavior: "instant", block: "start" });
+      // Scroll to very top of fields section (above HF status and date format)
+      const fieldsSection = document.getElementById("fields-section");
+      if (fieldsSection) {
+        fieldsSection.scrollIntoView({ behavior: "instant", block: "start" });
       }
     });
   } catch (err) {
@@ -1012,9 +1012,9 @@ function doFormClear() {
   lastFilledValues = {};
   hideStatus();
   // Scroll back to top of form
-  const fieldsList = document.getElementById("fields-list");
-  if (fieldsList && fieldsList.firstElementChild) {
-    fieldsList.firstElementChild.scrollIntoView({ behavior: "smooth", block: "start" });
+  const fieldsSection = document.getElementById("fields-section");
+  if (fieldsSection) {
+    fieldsSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
 
