@@ -1140,6 +1140,7 @@ function switchTab(tab) {
   if (tab === "create") {
     document.getElementById("actions").style.display = "none";
     fetchCurrentSelection();
+    loadExistingPlaceholders();
   } else if (tab === "fill") {
     if (currentFields.length > 0) {
       document.getElementById("actions").style.display = "flex";
@@ -1382,6 +1383,41 @@ function onPlaceholderCreated(name, count) {
   if (existing) { existing.count += count; } else { createdPlaceholders.push({ name, count }); }
   renderCreatedList();
   showCreateStatus(`Created {{${name}}}${count > 1 ? ` -- replaced ${count} occurrences` : ""}.`, "success");
+}
+
+/** Load all existing DocFill CCs and populate the "Created so far" list. */
+async function loadExistingPlaceholders() {
+  try {
+    await Word.run(async (context) => {
+      const allCCs = context.document.contentControls;
+      allCCs.load("items,tag");
+      await context.sync();
+
+      // Count occurrences per key from all DocFill CCs
+      const counts = {};
+      for (const cc of allCCs.items) {
+        if (!isDocFillCC(cc)) continue;
+        const key = ccTagToKey(cc.tag);
+        counts[key] = (counts[key] || 0) + 1;
+      }
+
+      // Merge with session-created placeholders (don't lose session entries)
+      const existingNames = new Set(createdPlaceholders.map((e) => e.name));
+      for (const [key, count] of Object.entries(counts)) {
+        if (!existingNames.has(key)) {
+          createdPlaceholders.push({ name: key, count });
+        } else {
+          // Update count if document has different number
+          const entry = createdPlaceholders.find((e) => e.name === key);
+          if (entry) entry.count = count;
+        }
+      }
+
+      renderCreatedList();
+    });
+  } catch {
+    // Best effort -- don't block Create tab
+  }
 }
 
 function renderCreatedList() {
