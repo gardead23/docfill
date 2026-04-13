@@ -204,7 +204,6 @@ let scanInProgress = false;
 async function scanDocument() {
   if (scanInProgress) return;
   scanInProgress = true;
-  showStatus("Scanning document...", "info");
   setScanButtonLoading(true);
 
   let keysFoundInBody = false;
