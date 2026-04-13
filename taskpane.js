@@ -1314,33 +1314,22 @@ async function confirmReplace(replaceAll) {
     let createSkipped = 0;
     await Word.run(async (context) => {
       if (replaceAll) {
-        const bodies = await getAllBodies(context);
-        for (const b of bodies) {
-          try {
-            const results = b.search(text, { matchCase: true });
-            results.load("items");
-            await context.sync();
-            if (results.items.length > 0) {
-              for (const range of results.items) {
-                const cc = range.insertContentControl();
-                cc.tag = keyToCCTag(name);
-                cc.title = toTitleCase(name);
-                cc.appearance = Word.ContentControlAppearance.boundingBox;
-                cc.placeholderText = `{{${name}}}`;
-                cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
-              }
-              count += results.items.length;
-              await context.sync();
-            }
-          } catch (bodyErr) {
-            if (bodyErr.code === "GeneralException") {
-              // Linked header already modified -- expected
-            } else {
-              createSkipped++;
-              console.warn("DocFill: error in create:", bodyErr.message || bodyErr);
-            }
-          }
+        // Search main body with one sync, then batch all replacements
+        const mainBody = context.document.body;
+        const results = mainBody.search(text, { matchCase: true });
+        results.load("items");
+        await context.sync();
+
+        for (const range of results.items) {
+          const cc = range.insertContentControl();
+          cc.tag = keyToCCTag(name);
+          cc.title = toTitleCase(name);
+          cc.appearance = Word.ContentControlAppearance.boundingBox;
+          cc.placeholderText = `{{${name}}}`;
+          cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         }
+        count += results.items.length;
+        if (count > 0) await context.sync();
       } else {
         const rawItems = await searchAllBodies(context, text, { matchCase: true });
         const items = await dedupeRanges(context, rawItems);
@@ -1387,6 +1376,11 @@ function onPlaceholderCreated(name, count) {
 
 /** Load all existing DocFill CCs and populate the "Created so far" list. */
 async function loadExistingPlaceholders() {
+  const statusEl = document.getElementById("create-loading-status");
+  if (statusEl) {
+    statusEl.innerHTML = '<span class="spinner-small"></span> Loading existing placeholders...';
+    statusEl.style.display = "flex";
+  }
   try {
     await Word.run(async (context) => {
       const allCCs = context.document.contentControls;
@@ -1407,7 +1401,6 @@ async function loadExistingPlaceholders() {
         if (!existingNames.has(key)) {
           createdPlaceholders.push({ name: key, count });
         } else {
-          // Update count if document has different number
           const entry = createdPlaceholders.find((e) => e.name === key);
           if (entry) entry.count = count;
         }
@@ -1416,7 +1409,9 @@ async function loadExistingPlaceholders() {
       renderCreatedList();
     });
   } catch {
-    // Best effort -- don't block Create tab
+    // Best effort
+  } finally {
+    if (statusEl) statusEl.style.display = "none";
   }
 }
 
