@@ -202,7 +202,7 @@ function convertRangeToCC(range, key) {
 let scanInProgress = false;
 
 async function scanDocument() {
-  if (scanInProgress) return;
+  if (scanInProgress || hfScanInProgress) return;
   scanInProgress = true;
   setScanButtonLoading(true);
 
