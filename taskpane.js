@@ -376,11 +376,14 @@ async function scanDocument() {
   // because persistent CCs already cover all fields including headers.
   try {
     if (!hadExistingCCs || keysFoundInBody) {
-      // HF scan needed -- run in background but show status so user knows
-      // the document may be briefly unresponsive.
-      showStatus("Scanning headers and footers...", "info");
+      // HF scan needed -- run in background with top-of-form status
+      const hfStatusEl = document.getElementById("hf-status");
+      if (hfStatusEl) {
+        hfStatusEl.innerHTML = '<span class="spinner-small"></span> Scanning headers and footers...';
+        hfStatusEl.style.display = "flex";
+      }
       scanHeaderFooters().then(() => {
-        hideStatus();
+        if (hfStatusEl) hfStatusEl.style.display = "none";
       });
     }
   } finally {
