@@ -379,7 +379,7 @@ async function scanDocument() {
       // HF scan needed -- run in background with top-of-form status
       const hfStatusEl = document.getElementById("hf-status");
       if (hfStatusEl) {
-        hfStatusEl.innerHTML = '<span class="spinner-small"></span> Scanning headers and footers...';
+        hfStatusEl.innerHTML = '<span class="spinner-small"></span> Start filling below. Document is finishing setup -- you may notice cursor flickering for a few seconds.';
         hfStatusEl.style.display = "flex";
       }
       scanHeaderFooters().then(() => {
