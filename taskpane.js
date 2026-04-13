@@ -332,10 +332,9 @@ async function scanDocument() {
       }
       hasFilled = Object.keys(lastFilledValues).length > 0;
 
-      // Preserve field order; append new keys at end
-      const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.includes(k));
-      const brandNewKeys = allKeys.filter((k) => !currentFields.some((f) => f.key === k));
-      const keys = [...orderedExisting, ...brandNewKeys];
+      // Use document order: allKeys comes from ccMap which is built from
+      // contentControls in document order (first occurrence of each key)
+      const keys = allKeys;
 
       currentStorageKey = buildStorageKey(keys);
       const saved = loadFieldConfigsWithMigration(currentStorageKey, keys);
@@ -479,9 +478,7 @@ async function scanHeaderFooters() {
         }
 
         hasFilled = Object.keys(lastFilledValues).length > 0;
-        const orderedExisting = currentFields.map((f) => f.key).filter((k) => allKeys.includes(k));
-        const brandNewKeys = allKeys.filter((k) => !currentFields.some((f) => f.key === k));
-        const keys = [...orderedExisting, ...brandNewKeys];
+        const keys = allKeys;
 
         currentStorageKey = buildStorageKey(keys);
         const saved = loadFieldConfigsWithMigration(currentStorageKey, keys);
