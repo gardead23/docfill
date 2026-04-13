@@ -1139,8 +1139,7 @@ function switchTab(tab) {
   document.getElementById("panel-fill").style.display = tab === "fill" ? "block" : "none";
   if (tab === "create") {
     document.getElementById("actions").style.display = "none";
-    fetchCurrentSelection();
-    loadExistingPlaceholders();
+    initCreateTab();
   } else if (tab === "fill") {
     if (currentFields.length > 0) {
       document.getElementById("actions").style.display = "flex";
@@ -1148,6 +1147,28 @@ function switchTab(tab) {
     // Auto-rescan to pick up any new placeholders added since last scan
     scanDocument();
   }
+}
+
+/** Initialize Create tab: show status, load placeholders, then start selection monitoring. */
+async function initCreateTab() {
+  const statusEl = document.getElementById("create-loading-status");
+  if (statusEl) {
+    statusEl.innerHTML = '<span class="spinner-small"></span> Loading document placeholders...';
+    statusEl.style.display = "flex";
+  }
+
+  // Wait for any in-progress HF scan to finish before loading placeholders
+  // so all CCs are available
+  while (hfScanInProgress) {
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  await loadExistingPlaceholders();
+
+  if (statusEl) statusEl.style.display = "none";
+
+  // Start selection monitoring after loading is done (avoids cursor flickering)
+  fetchCurrentSelection();
 }
 
 // ── Selection Monitoring ───────────────────────────────────────────────────────
@@ -1376,18 +1397,12 @@ function onPlaceholderCreated(name, count) {
 
 /** Load all existing DocFill CCs and populate the "Created so far" list. */
 async function loadExistingPlaceholders() {
-  const statusEl = document.getElementById("create-loading-status");
-  if (statusEl) {
-    statusEl.innerHTML = '<span class="spinner-small"></span> Loading existing placeholders...';
-    statusEl.style.display = "flex";
-  }
   try {
     await Word.run(async (context) => {
       const allCCs = context.document.contentControls;
       allCCs.load("items,tag");
       await context.sync();
 
-      // Count occurrences per key from all DocFill CCs
       const counts = {};
       for (const cc of allCCs.items) {
         if (!isDocFillCC(cc)) continue;
@@ -1395,23 +1410,12 @@ async function loadExistingPlaceholders() {
         counts[key] = (counts[key] || 0) + 1;
       }
 
-      // Merge with session-created placeholders (don't lose session entries)
-      const existingNames = new Set(createdPlaceholders.map((e) => e.name));
-      for (const [key, count] of Object.entries(counts)) {
-        if (!existingNames.has(key)) {
-          createdPlaceholders.push({ name: key, count });
-        } else {
-          const entry = createdPlaceholders.find((e) => e.name === key);
-          if (entry) entry.count = count;
-        }
-      }
-
+      // Rebuild list from document CCs (replaces session-only tracking)
+      createdPlaceholders = Object.entries(counts).map(([name, count]) => ({ name, count }));
       renderCreatedList();
     });
   } catch {
     // Best effort
-  } finally {
-    if (statusEl) statusEl.style.display = "none";
   }
 }
 
