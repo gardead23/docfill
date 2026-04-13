@@ -1156,32 +1156,29 @@ async function initCreateTab() {
   // Show placeholders immediately from body text (fast)
   await loadExistingPlaceholders();
 
-  // Kick off full document scan in background if not already done.
-  // This converts raw {{text}} to CCs and scans headers/footers,
-  // so everything is ready when the user switches to Fill.
-  if (!scanInProgress && !hfScanInProgress) {
+  // Kick off full document scan if not already done.
+  // This converts raw {{text}} to CCs and scans headers/footers.
+  const needsScan = !scanInProgress && !hfScanInProgress;
+  const hfRunning = hfScanInProgress;
+
+  if (needsScan || hfRunning) {
     if (statusEl) {
       statusEl.innerHTML = '<span class="spinner-small"></span> Setting up document fields -- you may notice cursor flickering for a few seconds.';
       statusEl.style.display = "flex";
     }
-    // Run scan without blocking the Create tab UI
-    scanDocument().then(() => {
-      // Reload placeholder list after scan finishes (picks up HF placeholders)
-      loadExistingPlaceholders();
-      if (statusEl) statusEl.style.display = "none";
-    });
-  } else if (hfScanInProgress) {
-    if (statusEl) {
-      statusEl.innerHTML = '<span class="spinner-small"></span> Still setting up document fields -- cursor may flicker briefly.';
-      statusEl.style.display = "flex";
-    }
-    // Wait for HF scan then reload
-    const waitForHf = async () => {
-      while (hfScanInProgress) await new Promise((r) => setTimeout(r, 200));
+
+    // Start scan if needed (fires HF scan in background)
+    if (needsScan) scanDocument();
+
+    // Wait for everything to finish (scan + HF scan), then reload and clear status
+    const waitForCompletion = async () => {
+      while (scanInProgress || hfScanInProgress) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
       await loadExistingPlaceholders();
       if (statusEl) statusEl.style.display = "none";
     };
-    waitForHf();
+    waitForCompletion();
   }
 
   // Start selection monitoring
