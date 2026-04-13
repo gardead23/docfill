@@ -366,8 +366,16 @@ async function scanDocument() {
     const hfStatusEl = document.getElementById("hf-status");
     const fillBtn = document.getElementById("fill-btn");
     if (hfStatusEl) {
-      hfStatusEl.innerHTML = '<span class="spinner-small"></span> Start filling below. Document is finishing setup -- you may notice cursor flickering for a few seconds.';
-      hfStatusEl.style.display = "flex";
+      hfStatusEl.innerHTML = `
+        <div class="scan-banner-content">
+          <div class="scan-banner-icon">&#8505;&#65039;</div>
+          <div>
+            <div class="scan-banner-header">Start filling whenever you're ready.</div>
+            <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates, but you can begin your work immediately.</div>
+          </div>
+        </div>
+        <div class="scan-banner-progress"><div class="scan-banner-progress-bar"></div></div>`;
+      hfStatusEl.style.display = "block";
     }
     if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Finishing setup..."; }
     scanHeaderFooters().then(() => {
@@ -1151,8 +1159,13 @@ async function initCreateTab() {
 
   if (needsScan || hfRunning) {
     if (statusEl) {
-      statusEl.innerHTML = '<span class="spinner-small"></span> Setting up document fields -- you may notice cursor flickering for a few seconds.';
-      statusEl.style.display = "flex";
+      statusEl.innerHTML = `
+        <div class="scan-banner-content">
+          <div class="scan-banner-header">Syncing document fields...</div>
+          <div class="scan-banner-body">We're scanning your template to set up your fields. For large templates, this background process can take up to 30 seconds.</div>
+        </div>
+        <div class="scan-banner-progress"><div class="scan-banner-progress-bar"></div></div>`;
+      statusEl.style.display = "block";
     }
 
     // Start scan if needed (fires HF scan in background)
