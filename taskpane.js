@@ -522,7 +522,10 @@ async function scanHeaderFooters() {
 function renderForm(fields) {
   document.getElementById("empty-state").style.display = "none";
   document.getElementById("fields-section").style.display = "block";
-  document.getElementById("actions").style.display = "flex";
+  // Only show Fill/Reset footer when Fill tab is active
+  if (activeTab === "fill") {
+    document.getElementById("actions").style.display = "flex";
+  }
 
   const n = fields.length;
   document.getElementById("field-count").textContent = n === 1 ? "1 field" : `${n} fields`;
