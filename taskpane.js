@@ -1152,22 +1152,39 @@ function switchTab(tab) {
 /** Initialize Create tab: show status, load placeholders, then start selection monitoring. */
 async function initCreateTab() {
   const statusEl = document.getElementById("create-loading-status");
-  if (statusEl) {
-    statusEl.innerHTML = '<span class="spinner-small"></span> Loading document placeholders...';
-    statusEl.style.display = "flex";
-  }
 
-  // Wait for any in-progress HF scan to finish before loading placeholders
-  // so all CCs are available
-  while (hfScanInProgress) {
-    await new Promise((r) => setTimeout(r, 200));
-  }
-
+  // Show placeholders immediately from body text (fast)
   await loadExistingPlaceholders();
 
-  if (statusEl) statusEl.style.display = "none";
+  // Kick off full document scan in background if not already done.
+  // This converts raw {{text}} to CCs and scans headers/footers,
+  // so everything is ready when the user switches to Fill.
+  if (!scanInProgress && !hfScanInProgress) {
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="spinner-small"></span> Setting up document fields -- you may notice cursor flickering for a few seconds.';
+      statusEl.style.display = "flex";
+    }
+    // Run scan without blocking the Create tab UI
+    scanDocument().then(() => {
+      // Reload placeholder list after scan finishes (picks up HF placeholders)
+      loadExistingPlaceholders();
+      if (statusEl) statusEl.style.display = "none";
+    });
+  } else if (hfScanInProgress) {
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="spinner-small"></span> Still setting up document fields -- cursor may flicker briefly.';
+      statusEl.style.display = "flex";
+    }
+    // Wait for HF scan then reload
+    const waitForHf = async () => {
+      while (hfScanInProgress) await new Promise((r) => setTimeout(r, 200));
+      await loadExistingPlaceholders();
+      if (statusEl) statusEl.style.display = "none";
+    };
+    waitForHf();
+  }
 
-  // Start selection monitoring after loading is done (avoids cursor flickering)
+  // Start selection monitoring
   fetchCurrentSelection();
 }
 
