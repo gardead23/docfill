@@ -1395,22 +1395,36 @@ function onPlaceholderCreated(name, count) {
   showCreateStatus(`Created {{${name}}}${count > 1 ? ` -- replaced ${count} occurrences` : ""}.`, "success");
 }
 
-/** Load all existing DocFill CCs and populate the "Created so far" list. */
+/** Load all existing placeholders (DocFill CCs + raw {{text}}) and populate the list. */
 async function loadExistingPlaceholders() {
   try {
     await Word.run(async (context) => {
       const allCCs = context.document.contentControls;
       allCCs.load("items,tag");
+      const body = context.document.body;
+      body.load("text");
       await context.sync();
 
+      // Count from DocFill CCs
       const counts = {};
+      const ccKeys = new Set();
       for (const cc of allCCs.items) {
         if (!isDocFillCC(cc)) continue;
         const key = ccTagToKey(cc.tag);
+        ccKeys.add(key);
         counts[key] = (counts[key] || 0) + 1;
       }
 
-      // Rebuild list from document CCs (replaces session-only tracking)
+      // Count raw {{key}} patterns not already covered by CCs
+      const bodyText = body.text || "";
+      const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
+      for (const m of rawMatches) {
+        const key = m.replace(/\{\{|\}\}/g, "");
+        if (!ccKeys.has(key)) {
+          counts[key] = (counts[key] || 0) + 1;
+        }
+      }
+
       createdPlaceholders = Object.entries(counts).map(([name, count]) => ({ name, count }));
       renderCreatedList();
     });
