@@ -238,6 +238,12 @@ describe("ccTagToKey", () => {
   it("handles keys with underscores", () => {
     expect(ccTagToKey("docfill:first_middle_last")).toBe("first_middle_last");
   });
+
+  it("normalizes to lowercase", () => {
+    expect(ccTagToKey("docfill:Describe")).toBe("describe");
+    expect(ccTagToKey("docfill:CLIENT_NAME")).toBe("client_name");
+    expect(ccTagToKey("Client_Name")).toBe("client_name");
+  });
 });
 
 describe("keyToCCTag", () => {
@@ -247,6 +253,11 @@ describe("keyToCCTag", () => {
 
   it("handles empty key", () => {
     expect(keyToCCTag("")).toBe("docfill:");
+  });
+
+  it("normalizes to lowercase", () => {
+    expect(keyToCCTag("Describe")).toBe("docfill:describe");
+    expect(keyToCCTag("CLIENT_NAME")).toBe("docfill:client_name");
   });
 });
 

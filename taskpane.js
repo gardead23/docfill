@@ -12,10 +12,11 @@ function isDocFillCC(cc) {
   return !!(cc && cc.tag && cc.tag.startsWith(DOCFILL_TAG_PREFIX));
 }
 function ccTagToKey(tag) {
-  return tag.startsWith(DOCFILL_TAG_PREFIX) ? tag.slice(DOCFILL_TAG_PREFIX.length) : tag;
+  const raw = tag.startsWith(DOCFILL_TAG_PREFIX) ? tag.slice(DOCFILL_TAG_PREFIX.length) : tag;
+  return raw.toLowerCase();
 }
 function keyToCCTag(key) {
-  return DOCFILL_TAG_PREFIX + key;
+  return DOCFILL_TAG_PREFIX + key.toLowerCase();
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -248,25 +249,27 @@ async function scanDocument() {
 
       const bodyText = mainBody.text || "";
       const bodyMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      // Search ALL keys found in body text -- a key may already have CCs but
-      // the user could have added a new raw occurrence of the same key.
-      // Per-range parent-CC check handles dedup (skips ranges inside existing CCs).
-      const keysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
+      // Collect unique original-cased patterns and their lowercase keys
+      const rawPatterns = [...new Set(bodyMatches)]; // e.g. ["{{Describe}}", "{{name}}"]
+      const keysInBody = [...new Set(rawPatterns.map((m) => m.replace(/\{\{|\}\}/g, "").toLowerCase()))];
 
       let convertedAny = false;
 
-      if (keysInBody.length > 0) {
+      if (rawPatterns.length > 0) {
+        // Search for each original-cased pattern (case-sensitive match)
         const searches = {};
-        for (const key of keysInBody) {
-          searches[key] = mainBody.search(`{{${key}}}`, { matchCase: true });
-          searches[key].load("items");
+        for (const pattern of rawPatterns) {
+          const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
+          searches[pattern] = { key, results: mainBody.search(pattern, { matchCase: true }) };
+          searches[pattern].results.load("items");
         }
         await context.sync();
 
         // Batch parent-CC checks
         const rangeEntries = [];
-        for (const key of keysInBody) {
-          for (const range of searches[key].items) {
+        for (const pattern of rawPatterns) {
+          const { key, results } = searches[pattern];
+          for (const range of results.items) {
             const parentCC = range.parentContentControlOrNullObject;
             parentCC.load("tag");
             rangeEntries.push({ key, range, parentCC });
@@ -418,19 +421,21 @@ async function scanHeaderFooters() {
         try {
           const hfText = b.text || "";
           const hfMatches = hfText.match(/\{\{(\w+)\}\}/g) || [];
-          const hfKeys = [...new Set(hfMatches.map((m) => m.replace(/\{\{|\}\}/g, "")))];
-          if (hfKeys.length === 0) continue;
+          const hfPatterns = [...new Set(hfMatches)];
+          if (hfPatterns.length === 0) continue;
 
           const hfSearches = {};
-          for (const key of hfKeys) {
-            hfSearches[key] = b.search(`{{${key}}}`, { matchCase: true });
-            hfSearches[key].load("items");
+          for (const pattern of hfPatterns) {
+            const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
+            hfSearches[pattern] = { key, results: b.search(pattern, { matchCase: true }) };
+            hfSearches[pattern].results.load("items");
           }
           await context.sync();
 
           const rangeEntries = [];
-          for (const key of hfKeys) {
-            for (const range of hfSearches[key].items) {
+          for (const pattern of hfPatterns) {
+            const { key, results } = hfSearches[pattern];
+            for (const range of results.items) {
               const parentCC = range.parentContentControlOrNullObject;
               parentCC.load("tag");
               rangeEntries.push({ key, range, parentCC });
@@ -1181,11 +1186,11 @@ async function checkForNewPlaceholders() {
       // Check 2: raw {{key}} in body not covered by CCs
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      const newRawKeys = [];
+      const newRawPatterns = []; // original-cased patterns
       for (const m of rawMatches) {
-        const key = m.replace(/\{\{|\}\}/g, "");
+        const key = m.replace(/\{\{|\}\}/g, "").toLowerCase();
         if (!ccKeys.has(key)) {
-          newRawKeys.push(key);
+          newRawPatterns.push(m);
           needsUpdate = true;
         }
       }
@@ -1193,18 +1198,21 @@ async function checkForNewPlaceholders() {
       if (!needsUpdate) return;
 
       // Convert any new raw body placeholders to CCs (fast, body only)
-      if (newRawKeys.length > 0) {
+      if (newRawPatterns.length > 0) {
+        const uniquePatterns = [...new Set(newRawPatterns)];
         const searches = {};
-        for (const key of newRawKeys) {
-          searches[key] = body.search(`{{${key}}}`, { matchCase: true });
-          searches[key].load("items");
+        for (const pattern of uniquePatterns) {
+          const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
+          searches[pattern] = { key, results: body.search(pattern, { matchCase: true }) };
+          searches[pattern].results.load("items");
         }
         await context.sync();
 
         // Batch parent-CC checks
         const rangeEntries = [];
-        for (const key of newRawKeys) {
-          for (const range of searches[key].items) {
+        for (const pattern of uniquePatterns) {
+          const { key, results } = searches[pattern];
+          for (const range of results.items) {
             const parentCC = range.parentContentControlOrNullObject;
             parentCC.load("tag");
             rangeEntries.push({ key, range, parentCC });
@@ -1385,7 +1393,7 @@ function suggestPlaceholderName(text) {
 async function createPlaceholder() {
   const text = lastSelectedText;
   const nameInput = document.getElementById("placeholder-name-input");
-  const name = nameInput.value.trim();
+  const name = nameInput.value.trim().toLowerCase();
 
   if (!text) { showCreateStatus("Select some text in the document first.", "error"); return; }
   if (!name) { showCreateStatus("Enter a placeholder name.", "error"); nameInput.focus(); return; }
@@ -1557,7 +1565,7 @@ async function loadExistingPlaceholders() {
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
       for (const m of rawMatches) {
-        const key = m.replace(/\{\{|\}\}/g, "");
+        const key = m.replace(/\{\{|\}\}/g, "").toLowerCase();
         if (!ccKeys.has(key)) {
           counts[key] = (counts[key] || 0) + 1;
         }
