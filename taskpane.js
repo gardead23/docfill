@@ -1510,7 +1510,7 @@ async function createPlaceholder() {
   }
 
   // Reset to State 1 (idle)
-  btn.innerHTML = "Replace with Placeholder";
+  btn.innerHTML = "Convert to Placeholder";
   btn.disabled = true;
   btn.classList.add("btn-disabled");
   lastSelectedText = "";
@@ -1628,7 +1628,7 @@ async function confirmReplace(mode) {
   }
 
   // Reset to State 1 (idle)
-  btn.innerHTML = "Replace with Placeholder";
+  btn.innerHTML = "Convert to Placeholder";
   btn.disabled = true;
   btn.classList.add("btn-disabled");
   lastSelectedText = "";
