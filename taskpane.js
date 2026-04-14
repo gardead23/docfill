@@ -79,11 +79,9 @@ let lastSuggestedName = "";
 let createdPlaceholders = [];
 let pendingCreateText = "";
 let pendingCreateName = "";
-let pendingCreateIndex = -1;
 const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
-let lastSelectedOccurrenceIndex = -1;
 /** True while background HF scan is running */
 let hfScanInProgress = false;
 
@@ -1381,26 +1379,6 @@ async function fetchCurrentSelection() {
       await context.sync();
       const text = sel.text.trim();
       lastSelectedText = text.includes("\r") || text.includes("\n") ? "" : text;
-      lastSelectedOccurrenceIndex = -1;
-
-      if (lastSelectedText && lastSelectedText.length > 0) {
-        const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: true });
-        const items = await dedupeRanges(context, rawItems);
-        if (items.length > 1) {
-          for (let i = 0; i < items.length; i++) {
-            const loc = sel.compareLocationWith(items[i]);
-            await context.sync();
-            if (loc.value === Word.LocationRelation.equal ||
-                loc.value === Word.LocationRelation.contains ||
-                loc.value === Word.LocationRelation.inside ||
-                loc.value === "Equal" || loc.value === "Contains" || loc.value === "Inside") {
-              lastSelectedOccurrenceIndex = i;
-              break;
-            }
-          }
-        }
-      }
-
       updateSelectionPreview(lastSelectedText);
     });
   } catch { /* ignore */ }
@@ -1514,8 +1492,7 @@ async function createPlaceholder() {
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
-        pendingCreateIndex = lastSelectedOccurrenceIndex;
-        showReplaceAllConfirm(exactCount, allCount, name, lastSelectedOccurrenceIndex, existingCount);
+        showReplaceAllConfirm(exactCount, allCount, name, 0, existingCount);
       }
     });
 
@@ -1538,7 +1515,7 @@ async function createPlaceholder() {
   }
 }
 
-function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existingCount) {
+function showReplaceAllConfirm(exactCount, allCount, name, _unused, existingCount) {
   const el = document.getElementById("create-status");
   const variantCount = allCount - exactCount;
   const btnStyle = 'flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px';
@@ -1630,10 +1607,8 @@ async function confirmReplace(mode) {
   hideCreateStatus();
   const text = pendingCreateText;
   const name = pendingCreateName;
-  const targetIndex = pendingCreateIndex;
   pendingCreateText = "";
   pendingCreateName = "";
-  pendingCreateIndex = -1;
   if (!text || !name) return;
 
   const btn = document.getElementById("create-replace-btn");
@@ -1663,7 +1638,7 @@ async function confirmReplace(mode) {
 
       if (mode === "single") {
         // Find the free range that matches the user's current selection
-        let idx = 0;
+        let idx = -1;
         const sel = context.document.getSelection();
         for (let i = 0; i < freeRanges.length; i++) {
           const loc = sel.compareLocationWith(freeRanges[i]);
@@ -1676,6 +1651,10 @@ async function confirmReplace(mode) {
             idx = i;
             break;
           }
+        }
+        if (idx === -1) {
+          showCreateStatus("Selection changed. Please select the text again.", "error");
+          return;
         }
         const cc = freeRanges[idx].insertContentControl();
         cc.tag = keyToCCTag(name);
