@@ -1364,7 +1364,7 @@ async function fetchCurrentSelection() {
       lastSelectedOccurrenceIndex = -1;
 
       if (lastSelectedText && lastSelectedText.length > 0) {
-        const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: true });
+        const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: false });
         const items = await dedupeRanges(context, rawItems);
         if (items.length > 1) {
           for (let i = 0; i < items.length; i++) {
@@ -1433,7 +1433,7 @@ async function createPlaceholder() {
 
   try {
     await Word.run(async (context) => {
-      const rawItems = await searchAllBodies(context, text, { matchCase: true });
+      const rawItems = await searchAllBodies(context, text, { matchCase: false });
       const items = await dedupeRanges(context, rawItems);
       occurrenceCount = items.length;
 
@@ -1508,7 +1508,7 @@ async function confirmReplace(replaceAll) {
     await Word.run(async (context) => {
       if (replaceAll) {
         // Search all bodies and dedupe linked ranges, then batch replacements
-        const rawItems = await searchAllBodies(context, text, { matchCase: true });
+        const rawItems = await searchAllBodies(context, text, { matchCase: false });
         const items = await dedupeRanges(context, rawItems);
 
         for (const range of items) {
@@ -1522,7 +1522,7 @@ async function confirmReplace(replaceAll) {
         count += items.length;
         if (count > 0) await context.sync();
       } else {
-        const rawItems = await searchAllBodies(context, text, { matchCase: true });
+        const rawItems = await searchAllBodies(context, text, { matchCase: false });
         const items = await dedupeRanges(context, rawItems);
         if (items.length === 0) return;
         const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
