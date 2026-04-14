@@ -1509,12 +1509,18 @@ async function createPlaceholder() {
         cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         await context.sync();
       } else {
+        // Count existing CCs for this key
+        const existingCCs = context.document.contentControls.getByTag(keyToCCTag(name));
+        existingCCs.load("items");
+        await context.sync();
+        const existingCount = existingCCs.items.length;
+
         // Multiple matches or variants: show confirmation
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
         pendingCreateIndex = lastSelectedOccurrenceIndex;
-        showReplaceAllConfirm(exactCount, allCount, name, lastSelectedOccurrenceIndex);
+        showReplaceAllConfirm(exactCount, allCount, name, lastSelectedOccurrenceIndex, existingCount);
       }
     });
 
@@ -1537,45 +1543,46 @@ async function createPlaceholder() {
   }
 }
 
-function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex) {
+function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existingCount) {
   const el = document.getElementById("create-status");
   const variantCount = allCount - exactCount;
   const btnStyle = 'flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px';
   const cancelStyle = 'padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer';
+  const noteStyle = 'margin-top:6px;font-size:11px;color:#6b7280;line-height:1.3';
 
   let description;
   let buttons;
+  const existingNote = existingCount > 0
+    ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. These new matches will be linked to it.</div>`
+    : "";
 
   if (variantCount === 0) {
     // Only exact matches
-    description = `Found <strong>${exactCount} matches</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
     const singleLabel = selectedIndex >= 0 ? `This one (#${selectedIndex + 1})` : "This one only";
     buttons = `
       <button onclick="confirmReplace('single')" style="${btnStyle}">${singleLabel}</button>
       <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
       <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else if (exactCount === 0) {
-    // Only variant matches (selected text not found exact, but variants exist)
+    // Only variant matches
     description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
     buttons = `
       <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} match${allCount > 1 ? "es" : ""}</button>
       <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else if (exactCount === 1 && variantCount > 0) {
     // 1 exact + variants
-    description = `Found <strong>1</strong> "${escapeHtml(pendingCreateText)}" and <strong>${variantCount} more</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = `
-      <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-      <button onclick="confirmReplace('all')" style="${btnStyle}">Both matches</button>
-      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
-    if (allCount > 2) {
-      buttons = `
-        <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-        <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
-        <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
-    }
+    description = `Found <strong>1 exact match</strong> and <strong>${variantCount} match${variantCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    buttons = allCount === 2
+      ? `<button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+         <button onclick="confirmReplace('all')" style="${btnStyle}">Both matches</button>
+         <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`
+      : `<button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+         <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+         <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else {
     // Multiple exact + variants
-    description = `Found <strong>${exactCount}</strong> same-capitalization matches and <strong>${variantCount} more</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong> and <strong>${variantCount} match${variantCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
     buttons = `
       <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
       <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} same-capitalization</button>
@@ -1584,7 +1591,7 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex) {
   }
 
   el.innerHTML = `
-    <div style="margin-bottom:8px">${description}</div>
+    <div style="margin-bottom:8px">${description}${existingNote}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
   el.className = "info";
   el.style.display = "block";
