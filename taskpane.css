@@ -170,8 +170,8 @@ main {
 }
 
 .field-reset-btn:hover {
-  color: #f59e0b;
-  background: #fffbeb;
+  color: #dc2626;
+  background: #fee2e2;
 }
 
 .field-reset-btn:disabled {

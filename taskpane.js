@@ -559,7 +559,6 @@ function renderForm(fields) {
         <button
           class="field-reset-btn"
           id="reset-btn-${escapeAttr(field.key)}"
-          title="Reset this field"
           onclick="resetField('${escapeAttr(field.key)}')"
           style="display:none"
         >
