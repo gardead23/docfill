@@ -803,26 +803,30 @@ footer#create-actions {
   text-align: center;
 }
 
-/* Remove (x) button -- invisible by default, fades in on row hover */
+/* Remove (×) button -- always reserves space, fades in on row hover */
 .created-row-remove {
   background: none;
   border: none;
-  padding: 2px 5px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border-radius: 4px;
-  font-size: 14px;
-  line-height: 1;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
   color: #9ca3af;
   cursor: pointer;
   opacity: 0;
+  flex-shrink: 0;
   transition: opacity 0.15s, color 0.1s, background 0.1s;
 }
 
-/* Row hover: show the x in neutral gray */
+/* Row hover: show × in neutral gray */
 .created-row:hover .created-row-remove {
   opacity: 1;
 }
 
-/* Action hover: x turns red with faint red background */
+/* × hover: red with faint red background */
 .created-row-remove:hover {
   color: #dc2626;
   background: #fee2e2;
