@@ -19,6 +19,11 @@ function keyToCCTag(key) {
   return DOCFILL_TAG_PREFIX + key.toLowerCase();
 }
 
+/** Check if text looks like a placeholder pattern (any casing). */
+function isPlaceholderText(text) {
+  return /^\{\{\w+\}\}$/.test(text.trim());
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 /** @type {{ key: string, label: string, type: string, dateFormat?: string }[]} */
@@ -325,8 +330,8 @@ async function scanDocument() {
       lastFilledValues = {};
       for (const [key, data] of Object.entries(ccMap)) {
         const text = data.text.trim();
-        // A CC is "filled" if its text is not the placeholder pattern and not empty
-        if (text && text !== `{{${key}}}`) {
+        // A CC is "filled" if its text is not a placeholder pattern (case-insensitive)
+        if (text && !isPlaceholderText(text)) {
           lastFilledValues[key] = data.text;
         }
       }
@@ -373,8 +378,8 @@ async function scanDocument() {
     if (hfStatusEl) {
       hfStatusEl.innerHTML = `
         <div class="scan-banner-content">
-          <div class="scan-banner-header">Start filling whenever you're ready.</div>
-          <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates, but you can begin filling in placeholders now.</div>
+          <div class="scan-banner-header">You can enter values now.</div>
+          <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates. Filling will be available when setup finishes.</div>
         </div>
         <div class="scan-banner-progress"><div class="scan-banner-progress-bar"></div></div>`;
       hfStatusEl.style.display = "block";
@@ -485,7 +490,7 @@ async function scanHeaderFooters() {
         // Hydrate filled values
         for (const [key, data] of Object.entries(ccMap)) {
           const text = data.text.trim();
-          if (text && text !== `{{${key}}}`) {
+          if (text && !isPlaceholderText(text)) {
             lastFilledValues[key] = data.text;
           }
         }
@@ -1075,7 +1080,15 @@ function loadFieldConfigsWithMigration(fingerprintedKey, keys) {
 }
 
 function loadFieldConfigs(storageKey) {
-  try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); }
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    // Normalize keys to lowercase for case-insensitive migration
+    const normalized = {};
+    for (const [k, v] of Object.entries(raw)) {
+      normalized[k.toLowerCase()] = v;
+    }
+    return normalized;
+  }
   catch { return {}; }
 }
 
@@ -1183,25 +1196,20 @@ async function checkForNewPlaceholders() {
         if (!currentKeys.has(key)) { needsUpdate = true; break; }
       }
 
-      // Check 2: raw {{key}} in body not covered by CCs
+      // Check 2: raw {{key}} in body -- search ALL patterns, not just new keys.
+      // Parent-CC check will skip ranges already inside CCs.
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      const newRawPatterns = []; // original-cased patterns
-      for (const m of rawMatches) {
-        const key = m.replace(/\{\{|\}\}/g, "").toLowerCase();
-        if (!ccKeys.has(key)) {
-          newRawPatterns.push(m);
-          needsUpdate = true;
-        }
-      }
+      const rawPatterns = [...new Set(rawMatches)];
+      // Any raw pattern means we might have unconverted occurrences
+      if (rawPatterns.length > 0) needsUpdate = true;
 
       if (!needsUpdate) return;
 
-      // Convert any new raw body placeholders to CCs (fast, body only)
-      if (newRawPatterns.length > 0) {
-        const uniquePatterns = [...new Set(newRawPatterns)];
+      // Convert any raw body placeholders to CCs (fast, body only)
+      if (rawPatterns.length > 0) {
         const searches = {};
-        for (const pattern of uniquePatterns) {
+        for (const pattern of rawPatterns) {
           const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
           searches[pattern] = { key, results: body.search(pattern, { matchCase: true }) };
           searches[pattern].results.load("items");
@@ -1210,7 +1218,7 @@ async function checkForNewPlaceholders() {
 
         // Batch parent-CC checks
         const rangeEntries = [];
-        for (const pattern of uniquePatterns) {
+        for (const pattern of rawPatterns) {
           const { key, results } = searches[pattern];
           for (const range of results.items) {
             const parentCC = range.parentContentControlOrNullObject;
@@ -1252,7 +1260,7 @@ async function checkForNewPlaceholders() {
       lastFilledValues = {};
       for (const [key, data] of Object.entries(ccMap)) {
         const text = data.text.trim();
-        if (text && text !== `{{${key}}}`) lastFilledValues[key] = data.text;
+        if (text && !isPlaceholderText(text)) lastFilledValues[key] = data.text;
       }
       hasFilled = Object.keys(lastFilledValues).length > 0;
 
@@ -1629,7 +1637,7 @@ async function navigateToChip(name) {
 
 function switchToFill() {
   switchTab("fill");
-  scanDocument();
+  // switchTab("fill") handles refresh via checkForNewPlaceholders or first-scan
 }
 
 // ── Create Status ──────────────────────────────────────────────────────────────

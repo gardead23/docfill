@@ -13,6 +13,7 @@ import {
   ccTagToKey,
   keyToCCTag,
   placeholderText,
+  isPlaceholderText,
   isCCUnfilled,
 } from "../lib/pure.mjs";
 
@@ -267,9 +268,34 @@ describe("placeholderText", () => {
   });
 });
 
+describe("isPlaceholderText", () => {
+  it("returns true for lowercase placeholder", () => {
+    expect(isPlaceholderText("{{client_name}}")).toBe(true);
+  });
+
+  it("returns true for mixed-case placeholder", () => {
+    expect(isPlaceholderText("{{ClientName}}")).toBe(true);
+    expect(isPlaceholderText("{{CLIENT_NAME}}")).toBe(true);
+  });
+
+  it("returns true with whitespace around", () => {
+    expect(isPlaceholderText("  {{name}}  ")).toBe(true);
+  });
+
+  it("returns false for filled values", () => {
+    expect(isPlaceholderText("Acme Corp")).toBe(false);
+    expect(isPlaceholderText("")).toBe(false);
+    expect(isPlaceholderText("{{not closed")).toBe(false);
+  });
+});
+
 describe("isCCUnfilled", () => {
   it("returns true when text matches placeholder", () => {
     expect(isCCUnfilled("{{client_name}}", "client_name")).toBe(true);
+  });
+
+  it("returns true for mixed-case placeholder", () => {
+    expect(isCCUnfilled("{{ClientName}}", "clientname")).toBe(true);
   });
 
   it("returns true when text is empty", () => {
@@ -284,7 +310,8 @@ describe("isCCUnfilled", () => {
     expect(isCCUnfilled("Acme Corp", "client_name")).toBe(false);
   });
 
-  it("returns false when text is a different placeholder", () => {
-    expect(isCCUnfilled("{{other_key}}", "client_name")).toBe(false);
+  it("returns true when text is any placeholder pattern", () => {
+    // Any {{word}} text is treated as unfilled, regardless of key match
+    expect(isCCUnfilled("{{other_key}}", "client_name")).toBe(true);
   });
 });
