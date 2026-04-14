@@ -843,6 +843,7 @@ footer#create-actions {
   color: #9ca3af;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   flex-shrink: 0;
   transition: opacity 0.15s, color 0.1s, background 0.1s;
 }
@@ -850,6 +851,7 @@ footer#create-actions {
 /* Row hover: show × in neutral gray */
 .created-row:hover .created-row-remove {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* × hover: red with faint red background */
@@ -862,6 +864,7 @@ footer#create-actions {
 @media (hover: none) {
   .created-row-remove {
     opacity: 1;
+    pointer-events: auto;
   }
 }
 

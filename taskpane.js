@@ -1509,12 +1509,14 @@ async function createPlaceholder() {
     showCreateStatus("Error: " + err.message, "error");
   }
 
-  // Reset to State 1 (idle)
-  btn.innerHTML = "Convert to Placeholder";
-  btn.disabled = true;
-  btn.classList.add("btn-disabled");
-  lastSelectedText = "";
-  updateSelectionPreview("");
+  // Reset to idle only if we actually completed (not showing confirmation)
+  if (shouldProceed || allCount === 0) {
+    btn.innerHTML = "Convert to Placeholder";
+    btn.disabled = true;
+    btn.classList.add("btn-disabled");
+    lastSelectedText = "";
+    updateSelectionPreview("");
+  }
 }
 
 function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex) {
