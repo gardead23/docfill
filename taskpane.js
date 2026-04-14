@@ -528,15 +528,12 @@ let fillFilterText = "";
 
 function setFillSort(mode) {
   fillSortMode = mode;
-  // Update button highlight
   const btn = document.getElementById("fill-sort-btn");
   if (btn) btn.classList.toggle("active", mode === "az");
-  // Update menu checkmarks
   document.getElementById("sort-opt-doc")?.classList.toggle("active", mode === "doc");
   document.getElementById("sort-opt-az")?.classList.toggle("active", mode === "az");
-  // Close menu and re-render
   closeSortMenu();
-  renderForm(currentFields);
+  applyFieldDisplayOrder();
 }
 
 function toggleSortMenu() {
@@ -567,25 +564,68 @@ function closeSortMenuOnOutsideClick(e) {
 
 function filterFillFields(query) {
   fillFilterText = query.toLowerCase();
-  renderForm(currentFields);
+  applyFieldDisplayOrder();
 }
 
-function getDisplayFields(fields) {
-  let result = [...fields];
+/**
+ * Reorder and show/hide existing DOM field rows without rebuilding them.
+ * This preserves all typed draft values.
+ */
+function applyFieldDisplayOrder() {
+  const fieldsList = document.getElementById("fields-list");
+  if (!fieldsList) return;
 
-  // Filter
-  if (fillFilterText) {
-    result = result.filter((f) =>
-      f.key.includes(fillFilterText) || f.label.toLowerCase().includes(fillFilterText)
-    );
-  }
+  const rows = Array.from(fieldsList.querySelectorAll(".field-row"));
+  if (rows.length === 0) return;
 
-  // Sort
+  // Build ordered list of keys
+  let orderedKeys = currentFields.map((f) => f.key);
   if (fillSortMode === "az") {
-    result.sort((a, b) => a.label.localeCompare(b.label));
+    orderedKeys = [...currentFields].sort((a, b) => a.label.localeCompare(b.label)).map((f) => f.key);
   }
 
-  return result;
+  // Build a map of key -> DOM row
+  const rowMap = {};
+  for (const row of rows) {
+    rowMap[row.dataset.key] = row;
+  }
+
+  // Reorder DOM nodes and apply filter visibility
+  let visibleCount = 0;
+  for (const key of orderedKeys) {
+    const row = rowMap[key];
+    if (!row) continue;
+
+    // Filter
+    if (fillFilterText) {
+      const field = currentFields.find((f) => f.key === key);
+      const matches = key.includes(fillFilterText) ||
+        (field && field.label.toLowerCase().includes(fillFilterText));
+      row.style.display = matches ? "" : "none";
+      if (matches) visibleCount++;
+    } else {
+      row.style.display = "";
+      visibleCount++;
+    }
+
+    // Move to end (reorders without destroying)
+    fieldsList.appendChild(row);
+  }
+
+  // Show "no results" message if needed
+  let noResults = fieldsList.querySelector(".fill-no-results");
+  if (visibleCount === 0 && fillFilterText) {
+    if (!noResults) {
+      noResults = document.createElement("div");
+      noResults.className = "fill-no-results";
+      noResults.style.cssText = "padding:16px;text-align:center;color:#9ca3af;font-size:12px";
+      noResults.textContent = "No fields match your search.";
+      fieldsList.appendChild(noResults);
+    }
+    noResults.style.display = "";
+  } else if (noResults) {
+    noResults.style.display = "none";
+  }
 }
 
 function renderForm(fields) {
@@ -599,17 +639,10 @@ function renderForm(fields) {
   const n = fields.length;
   document.getElementById("field-count").textContent = n === 1 ? "1 field" : `${n} fields`;
 
-  const displayFields = getDisplayFields(fields);
-
   const fieldsList = document.getElementById("fields-list");
   fieldsList.innerHTML = "";
 
-  if (displayFields.length === 0 && fillFilterText) {
-    fieldsList.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">No fields match your search.</div>';
-    return;
-  }
-
-  displayFields.forEach((field) => {
+  fields.forEach((field) => {
     const row = document.createElement("div");
     row.className = "field-row";
     row.dataset.key = field.key;
@@ -664,6 +697,9 @@ function renderForm(fields) {
   });
 
   renderGlobalDateFormat(fields);
+
+  // Apply current sort/filter to the freshly built rows
+  applyFieldDisplayOrder();
 }
 
 function renderGlobalDateFormat(fields) {
@@ -800,10 +836,17 @@ async function fillDocument() {
   const toFill = Object.fromEntries(Object.entries(allValues).filter(([, v]) => v.trim()));
   const emptyKeys = Object.keys(allValues).filter((k) => !allValues[k].trim());
 
+  // If search is active and there are hidden empty fields, clear the filter to reveal them
+  if (fillFilterText && emptyKeys.length > 0) {
+    const searchInput = document.getElementById("fill-search");
+    if (searchInput) searchInput.value = "";
+    fillFilterText = "";
+    applyFieldDisplayOrder();
+  }
+
   document.querySelectorAll(".field-row.field-empty").forEach((r) => r.classList.remove("field-empty"));
 
   if (Object.keys(toFill).length === 0) {
-    // Highlight all empty fields and scroll to the first one
     emptyKeys.forEach((key) => {
       document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
     });
@@ -1199,7 +1242,7 @@ function scrollToFirstEmptyField() {
 
   // Auto-focus the input after scroll settles
   setTimeout(() => {
-    const input = firstEmpty.querySelector(".field-value-input, .field-value-textarea");
+    const input = firstEmpty.querySelector(".field-value-input, .field-value-textarea, .date-month");
     if (input && !input.disabled) input.focus();
   }, 400);
 }
