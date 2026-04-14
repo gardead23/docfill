@@ -1476,10 +1476,8 @@ async function createPlaceholder() {
         r.parentContentControlOrNullObject.load("tag");
       }
       await context.sync();
-      const exactItems = exactDeduped.filter((r) => {
-        const p = r.parentContentControlOrNullObject;
-        return p.isNullObject || !p.tag || !p.tag.startsWith(DOCFILL_TAG_PREFIX);
-      });
+      // Skip ranges inside ANY content control (not just DocFill)
+      const exactItems = exactDeduped.filter((r) => r.parentContentControlOrNullObject.isNullObject);
       exactCount = exactItems.length;
 
       // Case-insensitive search for variants, also filtering
@@ -1489,10 +1487,7 @@ async function createPlaceholder() {
         r.parentContentControlOrNullObject.load("tag");
       }
       await context.sync();
-      const allItems = allDeduped.filter((r) => {
-        const p = r.parentContentControlOrNullObject;
-        return p.isNullObject || !p.tag || !p.tag.startsWith(DOCFILL_TAG_PREFIX);
-      });
+      const allItems = allDeduped.filter((r) => r.parentContentControlOrNullObject.isNullObject);
       allCount = allItems.length;
 
       const variantCount = allCount - exactCount;
@@ -1556,8 +1551,16 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
     ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. These new matches will be linked to it.</div>`
     : "";
 
-  if (allCount === 1) {
-    // Single match (only showing because existing CCs exist)
+  if (exactCount === 0) {
+    // Only variant matches (no exact-case matches at all)
+    description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    buttons = allCount === 1
+      ? `<button onclick="confirmReplace('all')" style="${btnStyle}">Convert</button>
+         <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`
+      : `<button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+         <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+  } else if (allCount === 1 && exactCount === 1) {
+    // Single exact match (only showing because existing CCs exist)
     description = `Found <strong>1 match</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
     buttons = `
       <button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
@@ -1569,12 +1572,6 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
     buttons = `
       <button onclick="confirmReplace('single')" style="${btnStyle}">${singleLabel}</button>
       <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
-      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
-  } else if (exactCount === 0) {
-    // Only variant matches
-    description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = `
-      <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} match${allCount > 1 ? "es" : ""}</button>
       <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else if (exactCount === 1 && variantCount > 0) {
     // 1 exact + variants
@@ -1634,15 +1631,13 @@ async function confirmReplace(mode) {
       }
       await context.sync();
 
-      const freeRanges = items.filter((range) => {
-        const parentCC = range.parentContentControlOrNullObject;
-        return parentCC.isNullObject || !parentCC.tag || !parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
-      });
+      // Skip ranges inside ANY content control
+      const freeRanges = items.filter((range) => range.parentContentControlOrNullObject.isNullObject);
 
       if (freeRanges.length === 0) return;
 
       if (mode === "single") {
-        const idx = (targetIndex >= 0 && targetIndex < freeRanges.length) ? targetIndex : 0;
+        const idx = 0; // Always use first free range for single replacement
         const cc = freeRanges[idx].insertContentControl();
         cc.tag = keyToCCTag(name);
         cc.title = toTitleCase(name);
