@@ -1492,7 +1492,7 @@ async function createPlaceholder() {
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
-        showReplaceAllConfirm(exactCount, allCount, name, 0, existingCount);
+        showReplaceAllConfirm(exactCount, allCount, name, existingCount);
       }
     });
 
@@ -1515,7 +1515,7 @@ async function createPlaceholder() {
   }
 }
 
-function showReplaceAllConfirm(exactCount, allCount, name, _unused, existingCount) {
+function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
   const el = document.getElementById("create-status");
   const variantCount = allCount - exactCount;
   const btnStyle = 'flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px';
