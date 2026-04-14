@@ -370,11 +370,8 @@ async function scanDocument() {
     if (hfStatusEl) {
       hfStatusEl.innerHTML = `
         <div class="scan-banner-content">
-          <div class="scan-banner-icon">&#8505;&#65039;</div>
-          <div>
-            <div class="scan-banner-header">Start filling whenever you're ready.</div>
-            <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates, but you can begin your work immediately.</div>
-          </div>
+          <div class="scan-banner-header">Start filling whenever you're ready.</div>
+          <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates, but you can begin filling in placeholders now.</div>
         </div>
         <div class="scan-banner-progress"><div class="scan-banner-progress-bar"></div></div>`;
       hfStatusEl.style.display = "block";

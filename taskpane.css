@@ -388,22 +388,13 @@ main {
 #create-loading-status .scan-banner-header { color: #1e3a5f; }
 #create-loading-status .scan-banner-body { color: #4b6a8a; }
 
-/* Fill tab: non-blocking subtle gray */
+/* Fill tab: same active blue as Create tab */
 #hf-status {
-  background: #F8FAFC;
-  border: 1px solid #E5E7EB;
+  background: #E8F0FE;
+  border: 1px solid #A0C3FF;
 }
-#hf-status .scan-banner-content {
-  display: flex;
-  gap: 10px;
-}
-#hf-status .scan-banner-icon {
-  font-size: 16px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-#hf-status .scan-banner-header { color: #1F2937; }
-#hf-status .scan-banner-body { color: #4B5563; }
+#hf-status .scan-banner-header { color: #1e3a5f; }
+#hf-status .scan-banner-body { color: #4b6a8a; }
 
 /* Indeterminate progress bar */
 .scan-banner-progress {
