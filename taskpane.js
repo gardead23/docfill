@@ -1681,12 +1681,24 @@ async function deleteCreatedPlaceholder(name) {
       ccs.load("items");
       await context.sync();
 
-      // Replace CC text with the original selected text, then remove CC
+      // Convert back to plain text: strip {{braces}}, keep the word, remove CC
       for (const cc of ccs.items) {
-        cc.insertText(cc.text || name, Word.InsertLocation.replace);
-        cc.delete(true);
+        // Extract the plain key name from CC text (strip braces if present)
+        let plainText = cc.text || name;
+        const m = plainText.match(/^\{\{(\w+)\}\}$/);
+        if (m) plainText = m[1];
+        cc.insertText(plainText, Word.InsertLocation.replace);
       }
       await context.sync();
+
+      // Remove CC wrappers in a separate sync
+      const ccs2 = context.document.contentControls.getByTag(keyToCCTag(name));
+      ccs2.load("items");
+      await context.sync();
+      for (const cc of ccs2.items) {
+        cc.delete(true);
+      }
+      if (ccs2.items.length > 0) await context.sync();
     });
 
     // Remove from list and re-render
@@ -1707,7 +1719,9 @@ async function navigateToChip(name) {
       await context.sync();
 
       if (ccs.items.length === 0) {
-        showCreateStatus(`{{${name}}} not found.`, "error");
+        createdPlaceholders = createdPlaceholders.filter((e) => e.name !== name);
+        renderCreatedList(document.getElementById("created-list-search")?.value);
+        showCreateStatus(`Placeholder not found. {{${name}}} has been removed.`, "info");
         return;
       }
 
