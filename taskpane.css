@@ -368,7 +368,7 @@ main {
   position: relative;
   border-radius: 8px;
   margin-bottom: 10px;
-  overflow: hidden;
+  overflow: hidden; /* clips progress bar to rounded corners */
 }
 
 .scan-banner-content {
@@ -547,15 +547,16 @@ footer#create-actions {
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: #dc2626;
   cursor: pointer;
   padding: 4px 0;
   text-align: center;
-  transition: color 0.15s, text-decoration 0.15s;
+  opacity: 0.6;
+  transition: opacity 0.15s, text-decoration 0.15s;
 }
 
 .btn-clear:hover {
-  color: #dc2626;
+  opacity: 1;
   text-decoration: underline;
 }
 

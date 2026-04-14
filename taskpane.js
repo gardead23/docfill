@@ -381,7 +381,7 @@ async function scanDocument() {
       hfStatusEl.innerHTML = `
         <div class="scan-banner-content">
           <div class="scan-banner-header">You can enter values now.</div>
-          <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates. Filling will be available when setup finishes.</div>
+          <div class="scan-banner-body">We're finalizing the document setup in the background. This can take up to 30 seconds for large templates, but you can fill out the fields below while you wait. The "Fill Document" button will unlock when setup finishes.</div>
         </div>
         <div class="scan-banner-progress"><div class="scan-banner-progress-bar"></div></div>`;
       hfStatusEl.style.display = "block";
