@@ -1169,8 +1169,10 @@ function switchTab(tab) {
   document.getElementById("panel-fill").style.display = tab === "fill" ? "block" : "none";
   if (tab === "create") {
     document.getElementById("actions").style.display = "none";
+    document.getElementById("create-actions").style.display = "flex";
     initCreateTab();
   } else if (tab === "fill") {
+    document.getElementById("create-actions").style.display = "none";
     if (currentFields.length > 0) {
       document.getElementById("actions").style.display = "flex";
     }
@@ -1647,11 +1649,9 @@ async function loadExistingPlaceholders() {
 function renderCreatedList(filter) {
   const section = document.getElementById("created-list-section");
   const list = document.getElementById("created-list");
-  const doneBtn = document.getElementById("done-fill-btn");
   const countEl = document.getElementById("created-list-count");
-  if (createdPlaceholders.length === 0) { section.style.display = "none"; doneBtn.style.display = "none"; return; }
+  if (createdPlaceholders.length === 0) { section.style.display = "none"; return; }
   section.style.display = "block";
-  doneBtn.style.display = "block";
   if (countEl) countEl.textContent = `(${createdPlaceholders.length})`;
 
   const filterLower = (filter || "").toLowerCase();

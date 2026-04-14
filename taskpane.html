@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DocFill</title>
-  <link rel="stylesheet" href="taskpane.css?v=76"/>
+  <link rel="stylesheet" href="taskpane.css?v=77"/>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
@@ -69,9 +69,6 @@
           <div id="created-list" class="created-list-scroll"></div>
         </div>
 
-        <button class="btn btn-done" id="done-fill-btn" style="display:none" onclick="switchToFill()">
-          Done — Fill This Template
-        </button>
       </div>
 
       <!-- Fill panel -->
@@ -132,7 +129,13 @@
       <button class="btn-clear" onclick="clearForm()">Reset All Fields</button>
     </footer>
 
+    <footer id="create-actions" style="display:none">
+      <button class="btn btn-done" id="done-fill-btn" onclick="switchToFill()">
+        Done — Fill This Template
+      </button>
+    </footer>
+
   </div>
-  <script src="taskpane.js?v=76"></script>
+  <script src="taskpane.js?v=77"></script>
 </body>
 </html>
