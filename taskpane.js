@@ -1467,10 +1467,10 @@ async function createPlaceholder() {
       }
     });
 
-    if (!shouldProceed && occurrenceCount === 0) {
+    if (!shouldProceed && allCount === 0) {
       showCreateStatus("Could not find that text in the document -- try selecting it again.", "error");
     } else if (shouldProceed) {
-      onPlaceholderCreated(name, occurrenceCount);
+      onPlaceholderCreated(name, 1);
     }
   } catch (err) {
     showCreateStatus("Error: " + err.message, "error");
