@@ -571,7 +571,8 @@ main {
 }
 
 .field-row.field-empty .field-value-input,
-.field-row.field-empty .field-value-textarea {
+.field-row.field-empty .field-value-textarea,
+.field-row.field-empty .date-select {
   border-color: #fcd34d;
   background: #fffbeb;
 }
