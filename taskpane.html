@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DocFill</title>
-  <link rel="stylesheet" href="taskpane.css?v=64"/>
+  <link rel="stylesheet" href="taskpane.css?v=76"/>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
@@ -58,8 +58,15 @@
         <div id="create-status"></div>
 
         <div id="created-list-section" style="display:none">
-          <div class="created-list-header">Created so far</div>
-          <div id="created-list"></div>
+          <div class="created-list-header">
+            <span>Created so far</span>
+            <span class="created-list-count" id="created-list-count"></span>
+          </div>
+          <div class="created-list-search-wrap">
+            <svg class="created-list-search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5.5" cy="5.5" r="4.25" stroke="currentColor" stroke-width="1.2"/><path d="M9 9l3.5 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <input id="created-list-search" class="created-list-search" type="text" placeholder="Search fields..." oninput="filterCreatedList(this.value)" />
+          </div>
+          <div id="created-list" class="created-list-scroll"></div>
         </div>
 
         <button class="btn btn-done" id="done-fill-btn" style="display:none" onclick="switchToFill()">
@@ -126,6 +133,6 @@
     </footer>
 
   </div>
-  <script src="taskpane.js?v=75"></script>
+  <script src="taskpane.js?v=76"></script>
 </body>
 </html>

@@ -1644,16 +1644,57 @@ async function loadExistingPlaceholders() {
   }
 }
 
-function renderCreatedList() {
+function renderCreatedList(filter) {
   const section = document.getElementById("created-list-section");
   const list = document.getElementById("created-list");
   const doneBtn = document.getElementById("done-fill-btn");
+  const countEl = document.getElementById("created-list-count");
   if (createdPlaceholders.length === 0) { section.style.display = "none"; doneBtn.style.display = "none"; return; }
   section.style.display = "block";
   doneBtn.style.display = "block";
-  list.innerHTML = createdPlaceholders
-    .map((e) => `<span class="created-chip" onclick="navigateToChip('${escapeAttr(e.name)}')" title="Click to highlight in document">{{${escapeHtml(e.name)}}}${e.count > 1 ? `<span class="chip-count">\u00d7${e.count}</span>` : ""}</span>`)
-    .join("");
+  if (countEl) countEl.textContent = `(${createdPlaceholders.length})`;
+
+  const filterLower = (filter || "").toLowerCase();
+  const filtered = filterLower
+    ? createdPlaceholders.filter((e) => e.name.includes(filterLower))
+    : createdPlaceholders;
+
+  list.innerHTML = filtered.map((e) => `
+    <div class="created-row" onclick="navigateToChip('${escapeAttr(e.name)}')" title="Click to highlight in document">
+      <span class="created-row-name">{{${escapeHtml(e.name)}}}</span>
+      <span class="created-row-badge">${e.count}</span>
+      <span class="created-row-actions">
+        <button class="created-row-action delete" onclick="event.stopPropagation(); deleteCreatedPlaceholder('${escapeAttr(e.name)}')" title="Delete placeholder">&#128465;</button>
+      </span>
+    </div>`).join("");
+}
+
+function filterCreatedList(query) {
+  renderCreatedList(query);
+}
+
+/** Delete a placeholder: remove all its CCs from the document and refresh the list. */
+async function deleteCreatedPlaceholder(name) {
+  try {
+    await Word.run(async (context) => {
+      const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
+      ccs.load("items");
+      await context.sync();
+
+      // Replace CC text with the original selected text, then remove CC
+      for (const cc of ccs.items) {
+        cc.insertText(cc.text || name, Word.InsertLocation.replace);
+        cc.delete(true);
+      }
+      await context.sync();
+    });
+
+    // Remove from list and re-render
+    createdPlaceholders = createdPlaceholders.filter((e) => e.name !== name);
+    renderCreatedList(document.getElementById("created-list-search")?.value);
+  } catch (err) {
+    showCreateStatus("Error deleting placeholder: " + err.message, "error");
+  }
 }
 
 async function navigateToChip(name) {

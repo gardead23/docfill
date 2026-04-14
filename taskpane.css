@@ -677,6 +677,9 @@ footer#actions {
 }
 
 .created-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 11px;
   font-weight: 600;
   color: #6b7280;
@@ -685,41 +688,131 @@ footer#actions {
   margin-bottom: 8px;
 }
 
-#created-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.created-chip {
-  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+.created-list-count {
+  font-weight: 600;
   font-size: 11px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-  border-radius: 5px;
-  padding: 2px 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-  user-select: none;
+  color: #9ca3af;
 }
 
-.created-chip:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
+/* Search bar */
+.created-list-search-wrap {
+  position: relative;
+  margin-bottom: 6px;
 }
 
-.chip-count {
+.created-list-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.created-list-search {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  outline: none;
+}
+.created-list-search:focus {
+  border-color: #2563eb;
+  background: #fff;
+}
+.created-list-search::placeholder {
+  color: #9ca3af;
+}
+
+/* Scrollable list */
+.created-list-scroll {
+  max-height: 350px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.created-list-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.created-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.created-list-scroll::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+/* List row */
+.created-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid #f3f4f6;
+}
+.created-row:last-child {
+  border-bottom: none;
+}
+.created-row:hover {
+  background: #f9fafb;
+}
+
+.created-row-name {
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  color: #374151;
+}
+
+.created-row-badge {
+  font-size: 11px;
   font-weight: 600;
   color: #6b7280;
   background: #e5e7eb;
-  border-radius: 3px;
-  padding: 0 4px;
+  border-radius: 12px;
+  padding: 1px 7px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Hover actions (hidden by default) */
+.created-row-actions {
+  display: none;
+  gap: 4px;
+}
+.created-row:hover .created-row-badge {
+  display: none;
+}
+.created-row:hover .created-row-actions {
+  display: flex;
+}
+
+.created-row-action {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.created-row-action:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+.created-row-action.delete:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
 }
 
 /* ── Done Button ── */
