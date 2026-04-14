@@ -864,10 +864,6 @@ async function fillDocument() {
         if (resetBtn) resetBtn.style.display = "inline-flex";
       }
       if (emptyKeys.length > 0) {
-        const skipped = emptyKeys
-          .map((k) => currentFields.find((f) => f.key === k)?.label || k)
-          .join(", ");
-        showStatus(`Done. Highlighted fields were skipped: ${skipped}`, "info");
         scrollToFirstEmptyField();
       } else {
         showStatus("All fields filled successfully.", "success");
