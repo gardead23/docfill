@@ -1547,8 +1547,9 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
 
   let description;
   let buttons;
+  const renameStyle = 'flex:1;padding:6px 0;background:none;border:1.5px solid #d1d5db;border-radius:6px;font-family:inherit;font-size:12px;font-weight:500;color:#374151;cursor:pointer;min-width:80px';
   const existingNote = existingCount > 0
-    ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. These new matches will be linked to it.</div>`
+    ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. Converting will link to the same field.</div>`
     : "";
 
   if (exactCount === 0) {
@@ -1562,9 +1563,12 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
   } else if (allCount === 1 && exactCount === 1) {
     // Single exact match (only showing because existing CCs exist)
     description = `Found <strong>1 match</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = `
-      <button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
-      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+    buttons = existingCount > 0
+      ? `<button onclick="confirmReplace('single')" style="${btnStyle}">Link to existing</button>
+         <button onclick="promptRenamePlaceholder()" style="${renameStyle}">Use different name</button>
+         <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`
+      : `<button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
+         <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else if (variantCount === 0) {
     // Multiple exact matches only
     description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
@@ -1593,11 +1597,32 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
       <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   }
 
+  // For multi-match with existing CCs, add rename option as a secondary row
+  const renameRow = (existingCount > 0 && allCount > 1)
+    ? `<div style="margin-top:6px"><button onclick="promptRenamePlaceholder()" style="${renameStyle};width:100%">Use different name</button></div>`
+    : "";
+
   el.innerHTML = `
     <div style="margin-bottom:8px">${description}${existingNote}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>${renameRow}`;
   el.className = "info";
   el.style.display = "block";
+}
+
+/** User chose "Use different name" -- focus the name input and dismiss the dialog. */
+function promptRenamePlaceholder() {
+  hideCreateStatus();
+  const nameInput = document.getElementById("placeholder-name-input");
+  if (nameInput) {
+    nameInput.value = "";
+    nameInput.disabled = false;
+    nameInput.focus();
+    nameInput.placeholder = "Enter a unique name...";
+  }
+  // Keep pendingCreateText/Name so the user can submit with the new name
+  // Reset shouldProceed state -- they'll click Convert again after renaming
+  const btn = document.getElementById("create-replace-btn");
+  if (btn) { btn.disabled = false; btn.classList.remove("btn-disabled"); btn.innerHTML = "Convert to Placeholder"; }
 }
 
 /** @param {'single'|'exact'|'all'} mode */
