@@ -1576,7 +1576,7 @@ async function createPlaceholder() {
   try {
     await Word.run(async (context) => {
       // Exact-case search, filtering out ranges inside existing CCs
-      const exactRaw = await searchAllBodies(context, text, { matchCase: true });
+      const exactRaw = await searchAllBodies(context, text, { matchCase: true, matchWholeWord: true });
       const exactDeduped = await dedupeRanges(context, exactRaw);
 
       // Check parent CCs for exact matches
@@ -1589,7 +1589,7 @@ async function createPlaceholder() {
       exactCount = exactItems.length;
 
       // Case-insensitive search for variants, also filtering
-      const allRaw = await searchAllBodies(context, text, { matchCase: false });
+      const allRaw = await searchAllBodies(context, text, { matchCase: false, matchWholeWord: true });
       const allDeduped = await dedupeRanges(context, allRaw);
       for (const r of allDeduped) {
         r.parentContentControlOrNullObject.load("tag");
@@ -1750,7 +1750,7 @@ async function confirmReplace(mode) {
 
     await Word.run(async (context) => {
       const matchCase = mode === "single" || mode === "exact";
-      const rawItems = await searchAllBodies(context, text, { matchCase });
+      const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: true });
       const items = await dedupeRanges(context, rawItems);
       if (items.length === 0) return;
 
