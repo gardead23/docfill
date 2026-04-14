@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DocFill</title>
-  <link rel="stylesheet" href="taskpane.css?v=104"/>
+  <link rel="stylesheet" href="taskpane.css?v=105"/>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
@@ -116,9 +116,20 @@
               <svg class="fill-search-icon" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="5.5" cy="5.5" r="4.25" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
               <input id="fill-search" class="fill-search" type="text" placeholder="Search fields..." oninput="filterFillFields(this.value)" />
             </div>
-            <button class="fill-sort-btn" id="fill-sort-btn" onclick="toggleFillSort()">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2v10M2 10l2 2 2-2M10 12V2M8 4l2-2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            <div class="fill-sort-wrap">
+              <button class="fill-sort-btn" id="fill-sort-btn" onclick="toggleSortMenu()">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2v10M2 10l2 2 2-2M10 12V2M8 4l2-2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="fill-sort-menu" id="fill-sort-menu" style="display:none">
+                <div class="fill-sort-header">Sort by</div>
+                <button class="fill-sort-option active" id="sort-opt-doc" onclick="setFillSort('doc')">
+                  <span class="fill-sort-check">&#10003;</span> Document order
+                </button>
+                <button class="fill-sort-option" id="sort-opt-az" onclick="setFillSort('az')">
+                  <span class="fill-sort-check">&#10003;</span> Alphabetical (A-Z)
+                </button>
+              </div>
+            </div>
           </div>
 
           <div id="hf-status" class="scan-banner" style="display:none"></div>
@@ -148,6 +159,6 @@
     </footer>
 
   </div>
-  <script src="taskpane.js?v=104"></script>
+  <script src="taskpane.js?v=105"></script>
 </body>
 </html>

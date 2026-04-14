@@ -344,6 +344,71 @@ main {
   color: #2563eb;
 }
 
+/* Sort dropdown */
+.fill-sort-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.fill-sort-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 180px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+}
+
+.fill-sort-header {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 10px 4px;
+}
+
+.fill-sort-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.fill-sort-option:hover {
+  background: #f3f4f6;
+}
+
+.fill-sort-option .fill-sort-check {
+  font-size: 12px;
+  color: transparent;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.fill-sort-option.active .fill-sort-check {
+  color: #2563eb;
+}
+
+.fill-sort-option.active {
+  font-weight: 500;
+  color: #1d4ed8;
+}
+
 /* ── Date dropdowns ── */
 .date-dropdowns {
   display: flex;

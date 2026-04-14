@@ -528,16 +528,41 @@ let fillFilterText = "";
 
 function setFillSort(mode) {
   fillSortMode = mode;
+  // Update button highlight
   const btn = document.getElementById("fill-sort-btn");
-  if (btn) {
-    btn.classList.toggle("active", mode === "az");
-    btn.title = mode === "az" ? "Sort: Alphabetical" : "Sort: Document order";
-  }
+  if (btn) btn.classList.toggle("active", mode === "az");
+  // Update menu checkmarks
+  document.getElementById("sort-opt-doc")?.classList.toggle("active", mode === "doc");
+  document.getElementById("sort-opt-az")?.classList.toggle("active", mode === "az");
+  // Close menu and re-render
+  closeSortMenu();
   renderForm(currentFields);
 }
 
-function toggleFillSort() {
-  setFillSort(fillSortMode === "doc" ? "az" : "doc");
+function toggleSortMenu() {
+  const menu = document.getElementById("fill-sort-menu");
+  if (!menu) return;
+  if (menu.style.display === "none") {
+    menu.style.display = "block";
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener("click", closeSortMenuOnOutsideClick, { once: true });
+    }, 0);
+  } else {
+    closeSortMenu();
+  }
+}
+
+function closeSortMenu() {
+  const menu = document.getElementById("fill-sort-menu");
+  if (menu) menu.style.display = "none";
+}
+
+function closeSortMenuOnOutsideClick(e) {
+  const wrap = document.querySelector(".fill-sort-wrap");
+  if (wrap && !wrap.contains(e.target)) {
+    closeSortMenu();
+  }
 }
 
 function filterFillFields(query) {
