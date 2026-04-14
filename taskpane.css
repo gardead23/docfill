@@ -792,16 +792,21 @@ footer#create-actions {
   text-align: center;
 }
 
-/* Hover actions (hidden by default) */
+/* Row actions */
 .created-row-actions {
-  display: none;
+  display: flex;
   gap: 4px;
-}
-.created-row:hover .created-row-badge {
-  display: none;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 .created-row:hover .created-row-actions {
-  display: flex;
+  opacity: 1;
+}
+/* Always show on touch devices */
+@media (hover: none) {
+  .created-row-actions {
+    opacity: 1;
+  }
 }
 
 .created-row-action {

@@ -1209,9 +1209,16 @@ async function checkForNewPlaceholders() {
       const currentKeys = new Set(currentFields.map((f) => f.key));
       let needsUpdate = false;
 
-      // Check 1: CCs not in current field list (created via Create tab)
+      // Check 1: CCs not in current field list (new fields added)
       for (const key of ccKeys) {
         if (!currentKeys.has(key)) { needsUpdate = true; break; }
+      }
+
+      // Check 1b: current fields no longer in CCs (fields deleted)
+      if (!needsUpdate) {
+        for (const key of currentKeys) {
+          if (!ccKeys.has(key)) { needsUpdate = true; break; }
+        }
       }
 
       // Check 2: search raw body patterns and convert any NOT inside CCs.
@@ -1664,7 +1671,7 @@ function renderCreatedList(filter) {
       <span class="created-row-name">{{${escapeHtml(e.name)}}}</span>
       <span class="created-row-badge">${e.count}</span>
       <span class="created-row-actions">
-        <button class="created-row-action delete" onclick="event.stopPropagation(); deleteCreatedPlaceholder('${escapeAttr(e.name)}')" title="Delete placeholder">&#128465;</button>
+        <button class="created-row-action delete" onclick="event.stopPropagation(); confirmDeletePlaceholder('${escapeAttr(e.name)}')" title="Remove placeholder">&#128465;</button>
       </span>
     </div>`).join("");
 }
@@ -1674,16 +1681,29 @@ function filterCreatedList(query) {
 }
 
 /** Delete a placeholder: remove all its CCs from the document and refresh the list. */
+function confirmDeletePlaceholder(name) {
+  const el = document.getElementById("create-status");
+  el.innerHTML = `
+    <div style="margin-bottom:6px;font-weight:600">Remove {{${escapeHtml(name)}}} from template?</div>
+    <div style="margin-bottom:10px;font-size:12px;color:#64748b">This keeps the visible text but removes all DocFill controls for this field across the document.</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="deleteCreatedPlaceholder('${escapeAttr(name)}')" style="flex:1;padding:7px 0;background:#dc2626;color:#fff;border:none;border-radius:7px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Remove</button>
+      <button onclick="hideCreateStatus()" style="padding:7px 12px;background:none;border:1.5px solid #e5e7eb;border-radius:7px;font-family:inherit;font-size:12px;color:#374151;cursor:pointer">Cancel</button>
+    </div>`;
+  el.className = "info";
+  el.style.display = "block";
+}
+
 async function deleteCreatedPlaceholder(name) {
+  hideCreateStatus();
   try {
     await Word.run(async (context) => {
       const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
-      ccs.load("items");
+      ccs.load("items,text");
       await context.sync();
 
-      // Convert back to plain text: strip {{braces}}, keep the word, remove CC
+      // Convert back to plain text: strip {{braces}}, keep the word
       for (const cc of ccs.items) {
-        // Extract the plain key name from CC text (strip braces if present)
         let plainText = cc.text || name;
         const m = plainText.match(/^\{\{(\w+)\}\}$/);
         if (m) plainText = m[1];
@@ -1701,11 +1721,18 @@ async function deleteCreatedPlaceholder(name) {
       if (ccs2.items.length > 0) await context.sync();
     });
 
-    // Remove from list and re-render
+    // Remove from Created list
     createdPlaceholders = createdPlaceholders.filter((e) => e.name !== name);
     renderCreatedList(document.getElementById("created-list-search")?.value);
+
+    // Reconcile Fill state: remove from currentFields and lastFilledValues
+    currentFields = currentFields.filter((f) => f.key !== name);
+    delete lastFilledValues[name];
+    if (Object.keys(lastFilledValues).length === 0) hasFilled = false;
+
+    showCreateStatus(`{{${name}}} removed from template.`, "success");
   } catch (err) {
-    showCreateStatus("Error deleting placeholder: " + err.message, "error");
+    showCreateStatus("Error removing placeholder: " + err.message, "error");
   }
 }
 
