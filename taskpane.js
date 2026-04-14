@@ -1143,10 +1143,48 @@ function switchTab(tab) {
     if (currentFields.length > 0) {
       document.getElementById("actions").style.display = "flex";
     }
-    // Only auto-scan on first visit; user clicks Rescan for subsequent scans
     if (!hasScannedOnce) {
+      // First visit: full scan
+      scanDocument();
+    } else {
+      // Quick check: any new raw placeholders in body not yet converted?
+      checkForNewPlaceholders();
+    }
+  }
+}
+
+/** Quick check for new raw placeholders in body. Triggers scan only if found. */
+async function checkForNewPlaceholders() {
+  try {
+    let foundNew = false;
+    await Word.run(async (context) => {
+      const body = context.document.body;
+      body.load("text");
+      const allCCs = context.document.contentControls;
+      allCCs.load("items,tag");
+      await context.sync();
+
+      // Find keys with CCs
+      const ccKeys = new Set();
+      for (const cc of allCCs.items) {
+        if (isDocFillCC(cc)) ccKeys.add(ccTagToKey(cc.tag));
+      }
+
+      // Check body text for raw {{key}} not covered by CCs
+      const bodyText = body.text || "";
+      const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
+      for (const m of rawMatches) {
+        const key = m.replace(/\{\{|\}\}/g, "");
+        if (!ccKeys.has(key)) { foundNew = true; break; }
+      }
+    });
+
+    if (foundNew) {
+      hasScannedOnce = false; // allow full scan
       scanDocument();
     }
+  } catch {
+    // Best effort
   }
 }
 
