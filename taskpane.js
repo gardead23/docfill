@@ -523,6 +523,39 @@ async function scanHeaderFooters() {
 
 // ── Render Form ────────────────────────────────────────────────────────────────
 
+let fillSortMode = "doc"; // "doc" or "az"
+let fillFilterText = "";
+
+function setFillSort(mode) {
+  fillSortMode = mode;
+  document.getElementById("sort-doc")?.classList.toggle("active", mode === "doc");
+  document.getElementById("sort-az")?.classList.toggle("active", mode === "az");
+  renderForm(currentFields);
+}
+
+function filterFillFields(query) {
+  fillFilterText = query.toLowerCase();
+  renderForm(currentFields);
+}
+
+function getDisplayFields(fields) {
+  let result = [...fields];
+
+  // Filter
+  if (fillFilterText) {
+    result = result.filter((f) =>
+      f.key.includes(fillFilterText) || f.label.toLowerCase().includes(fillFilterText)
+    );
+  }
+
+  // Sort
+  if (fillSortMode === "az") {
+    result.sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  return result;
+}
+
 function renderForm(fields) {
   document.getElementById("empty-state").style.display = "none";
   document.getElementById("fields-section").style.display = "block";
@@ -534,10 +567,17 @@ function renderForm(fields) {
   const n = fields.length;
   document.getElementById("field-count").textContent = n === 1 ? "1 field" : `${n} fields`;
 
+  const displayFields = getDisplayFields(fields);
+
   const fieldsList = document.getElementById("fields-list");
   fieldsList.innerHTML = "";
 
-  fields.forEach((field) => {
+  if (displayFields.length === 0 && fillFilterText) {
+    fieldsList.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">No fields match your search.</div>';
+    return;
+  }
+
+  displayFields.forEach((field) => {
     const row = document.createElement("div");
     row.className = "field-row";
     row.dataset.key = field.key;
