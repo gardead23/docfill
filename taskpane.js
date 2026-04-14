@@ -271,7 +271,7 @@ async function scanDocument() {
         const searches = {};
         for (const pattern of rawPatterns) {
           const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
-          searches[pattern] = { key, results: mainBody.search(pattern, { matchCase: true }) };
+          searches[pattern] = { key, results: mainBody.search(pattern, { matchCase: false }) };
           searches[pattern].results.load("items");
         }
         await context.sync();
@@ -438,7 +438,7 @@ async function scanHeaderFooters() {
           const hfSearches = {};
           for (const pattern of hfPatterns) {
             const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
-            hfSearches[pattern] = { key, results: b.search(pattern, { matchCase: true }) };
+            hfSearches[pattern] = { key, results: b.search(pattern, { matchCase: false }) };
             hfSearches[pattern].results.load("items");
           }
           await context.sync();
@@ -1228,7 +1228,7 @@ async function checkForNewPlaceholders() {
         const searches = {};
         for (const pattern of rawPatterns) {
           const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
-          searches[pattern] = { key, results: body.search(pattern, { matchCase: true }) };
+          searches[pattern] = { key, results: body.search(pattern, { matchCase: false }) };
           searches[pattern].results.load("items");
         }
         await context.sync();
