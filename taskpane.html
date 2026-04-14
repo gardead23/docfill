@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DocFill</title>
-  <link rel="stylesheet" href="taskpane.css?v=89"/>
+  <link rel="stylesheet" href="taskpane.css?v=90"/>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
@@ -33,8 +33,9 @@
       <!-- Create panel -->
       <div id="panel-create" style="display:none">
         <div id="create-loading-status" class="scan-banner" style="display:none"></div>
-        <div id="selection-preview" class="selection-preview">
-          <span class="selection-hint-text">Select text in your document to get started</span>
+        <div id="selection-preview" class="selection-preview selection-idle">
+          <svg class="selection-idle-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 1h4M5 13h4M7 1v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <span class="selection-idle-text">Highlight text in the document to begin</span>
         </div>
 
         <div class="create-form-group">
@@ -137,6 +138,6 @@
     </footer>
 
   </div>
-  <script src="taskpane.js?v=89"></script>
+  <script src="taskpane.js?v=90"></script>
 </body>
 </html>

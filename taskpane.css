@@ -638,27 +638,37 @@ footer#create-actions {
 }
 
 .selection-preview {
-  background: #f9fafb;
-  border: 1.5px solid #e5e7eb;
   border-radius: 8px;
-  padding: 10px 12px;
-  min-height: 42px;
+  padding: 12px;
+  min-height: 44px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  transition: border-color 0.15s, background 0.15s;
+  gap: 8px;
+  transition: border-color 0.2s, background 0.2s;
 }
 
+/* State 1: Idle -- dashed border dropzone */
+.selection-preview.selection-idle {
+  background: #f8fafc;
+  border: 1px dashed #d1d5db;
+  justify-content: center;
+}
+
+.selection-idle-icon {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.selection-idle-text {
+  font-size: 13px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+/* State 2: Active -- solid blue */
 .selection-preview.has-selection {
   background: #eff6ff;
-  border-color: #bfdbfe;
-}
-
-.selection-hint-text {
-  font-size: 12px;
-  color: #9ca3af;
-  font-style: italic;
+  border: 1px solid #93c5fd;
 }
 
 .selection-label {
@@ -671,7 +681,7 @@ footer#create-actions {
 }
 
 .selection-text {
-  font-size: 12.5px;
+  font-size: 13px;
   color: #1d4ed8;
   font-weight: 500;
   word-break: break-word;

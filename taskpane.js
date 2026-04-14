@@ -1415,8 +1415,8 @@ function updateSelectionPreview(text) {
 
   if (!text) {
     // State 1: Idle -- lock everything
-    preview.className = "selection-preview";
-    preview.innerHTML = '<span class="selection-hint-text">Select text in your document to get started</span>';
+    preview.className = "selection-preview selection-idle";
+    preview.innerHTML = '<svg class="selection-idle-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 1h4M5 13h4M7 1v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="selection-idle-text">Highlight text in the document to begin</span>';
     nameInput.disabled = true;
     nameInput.value = "";
     if (replaceBtn) { replaceBtn.disabled = true; replaceBtn.classList.add("btn-disabled"); }
