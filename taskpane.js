@@ -1679,11 +1679,11 @@ function renderCreatedList(filter) {
     : createdPlaceholders;
 
   list.innerHTML = filtered.map((e) => `
-    <div class="created-row" onclick="navigateToChip('${escapeAttr(e.name)}')" title="Click to highlight in document">
+    <div class="created-row" onclick="navigateToChip('${escapeAttr(e.name)}')">
       <span class="created-row-name">{{${escapeHtml(e.name)}}}</span>
-      <span class="created-row-badge">${e.count}</span>
-      <span class="created-row-actions">
-        <button class="created-row-action delete" onclick="event.stopPropagation(); confirmDeletePlaceholder('${escapeAttr(e.name)}')" title="Remove placeholder">&#128465;</button>
+      <span class="created-row-right">
+        <button class="created-row-action delete" onclick="event.stopPropagation(); confirmDeletePlaceholder('${escapeAttr(e.name)}')">&#128465;</button>
+        <span class="created-row-badge">${e.count}</span>
       </span>
     </div>`).join("");
 }

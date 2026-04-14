@@ -779,6 +779,17 @@ footer#create-actions {
   font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
   font-size: 12px;
   color: #374151;
+  transition: color 0.1s;
+}
+.created-row:hover .created-row-name {
+  color: #2563eb;
+}
+
+.created-row-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .created-row-badge {
@@ -792,24 +803,17 @@ footer#create-actions {
   text-align: center;
 }
 
-/* Row actions -- hidden by default, shown on hover */
-.created-row-actions {
-  display: none;
-  gap: 4px;
-}
-.created-row:hover .created-row-badge {
+/* Trash button hidden by default, appears on hover to the left of badge */
+.created-row-action.delete {
   display: none;
 }
-.created-row:hover .created-row-actions {
-  display: flex;
+.created-row:hover .created-row-action.delete {
+  display: inline-flex;
 }
 /* Always show on touch devices */
 @media (hover: none) {
-  .created-row-badge {
-    display: none;
-  }
-  .created-row-actions {
-    display: flex;
+  .created-row-action.delete {
+    display: inline-flex;
   }
 }
 
