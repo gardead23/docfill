@@ -803,7 +803,12 @@ async function fillDocument() {
   document.querySelectorAll(".field-row.field-empty").forEach((r) => r.classList.remove("field-empty"));
 
   if (Object.keys(toFill).length === 0) {
+    // Highlight all empty fields and scroll to the first one
+    emptyKeys.forEach((key) => {
+      document.querySelector(`.field-row[data-key="${key}"]`)?.classList.add("field-empty");
+    });
     showStatus("Fill in at least one field to continue.", "error");
+    scrollToFirstEmptyField();
     return;
   }
 
@@ -863,8 +868,7 @@ async function fillDocument() {
           .map((k) => currentFields.find((f) => f.key === k)?.label || k)
           .join(", ");
         showStatus(`Done. Highlighted fields were skipped: ${skipped}`, "info");
-        const firstEmpty = document.querySelector(".field-row.field-empty");
-        if (firstEmpty) firstEmpty.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        scrollToFirstEmptyField();
       } else {
         showStatus("All fields filled successfully.", "success");
       }
@@ -1188,6 +1192,21 @@ function saveFieldConfigs(storageKey, fields) {
 }
 
 // ── UI Helpers ─────────────────────────────────────────────────────────────────
+
+/** Scroll to the first empty/highlighted field and auto-focus its input. */
+function scrollToFirstEmptyField() {
+  const firstEmpty = document.querySelector(".field-row.field-empty");
+  if (!firstEmpty) return;
+
+  // Smooth scroll to center the field in view
+  firstEmpty.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  // Auto-focus the input after scroll settles
+  setTimeout(() => {
+    const input = firstEmpty.querySelector(".field-value-input, .field-value-textarea");
+    if (input && !input.disabled) input.focus();
+  }, 400);
+}
 
 function showStatus(msg, type) {
   const el = document.getElementById("status");
