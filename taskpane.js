@@ -334,7 +334,7 @@ async function scanDocument() {
         const text = data.text.trim();
         // A CC is "filled" if its text is not its own placeholder pattern
         if (text && !isPlaceholderTextForKey(text, key)) {
-          lastFilledValues[key] = data.text;
+          lastFilledValues[key] = data.text.replace(/\v/g, "\n");
         }
       }
       hasFilled = Object.keys(lastFilledValues).length > 0;
@@ -491,7 +491,7 @@ async function scanHeaderFooters() {
         for (const [key, data] of Object.entries(ccMap)) {
           const text = data.text.trim();
           if (text && !isPlaceholderTextForKey(text, key)) {
-            lastFilledValues[key] = data.text;
+            lastFilledValues[key] = data.text.replace(/\v/g, "\n");
           }
         }
 
@@ -1295,7 +1295,7 @@ async function checkForNewPlaceholders() {
       lastFilledValues = {};
       for (const [key, data] of Object.entries(ccMap)) {
         const text = data.text.trim();
-        if (text && !isPlaceholderTextForKey(text, key)) lastFilledValues[key] = data.text;
+        if (text && !isPlaceholderTextForKey(text, key)) lastFilledValues[key] = data.text.replace(/\v/g, "\n");
       }
       hasFilled = Object.keys(lastFilledValues).length > 0;
 
