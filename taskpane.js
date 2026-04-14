@@ -1572,7 +1572,7 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
   } else if (variantCount === 0) {
     // Multiple exact matches only
     description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    const singleLabel = selectedIndex >= 0 ? `This one (#${selectedIndex + 1})` : "This one only";
+    const singleLabel = "This one only";
     buttons = `
       <button onclick="confirmReplace('single')" style="${btnStyle}">${singleLabel}</button>
       <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
@@ -1662,7 +1662,21 @@ async function confirmReplace(mode) {
       if (freeRanges.length === 0) return;
 
       if (mode === "single") {
-        const idx = 0; // Always use first free range for single replacement
+        // Find the free range that matches the user's current selection
+        let idx = 0;
+        const sel = context.document.getSelection();
+        for (let i = 0; i < freeRanges.length; i++) {
+          const loc = sel.compareLocationWith(freeRanges[i]);
+          await context.sync();
+          const v = loc.value;
+          if (v === "Equal" || v === "Inside" || v === "Contains" ||
+              v === Word.LocationRelation.equal ||
+              v === Word.LocationRelation.inside ||
+              v === Word.LocationRelation.contains) {
+            idx = i;
+            break;
+          }
+        }
         const cc = freeRanges[idx].insertContentControl();
         cc.tag = keyToCCTag(name);
         cc.title = toTitleCase(name);
