@@ -260,27 +260,23 @@ async function scanDocument() {
 
       const bodyText = mainBody.text || "";
       const bodyMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      // Collect unique original-cased patterns and their lowercase keys
-      const rawPatterns = [...new Set(bodyMatches)]; // e.g. ["{{Describe}}", "{{name}}"]
-      const keysInBody = [...new Set(rawPatterns.map((m) => m.replace(/\{\{|\}\}/g, "").toLowerCase()))];
+      // Canonicalize to unique lowercase keys, search once per key with matchCase:false
+      const keysInBody = [...new Set(bodyMatches.map((m) => m.replace(/\{\{|\}\}/g, "").toLowerCase()))];
 
       let convertedAny = false;
 
-      if (rawPatterns.length > 0) {
-        // Search for each original-cased pattern (case-sensitive match)
+      if (keysInBody.length > 0) {
         const searches = {};
-        for (const pattern of rawPatterns) {
-          const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
-          searches[pattern] = { key, results: mainBody.search(pattern, { matchCase: false }) };
-          searches[pattern].results.load("items");
+        for (const key of keysInBody) {
+          searches[key] = mainBody.search(`{{${key}}}`, { matchCase: false });
+          searches[key].load("items");
         }
         await context.sync();
 
         // Batch parent-CC checks
         const rangeEntries = [];
-        for (const pattern of rawPatterns) {
-          const { key, results } = searches[pattern];
-          for (const range of results.items) {
+        for (const key of keysInBody) {
+          for (const range of searches[key].items) {
             const parentCC = range.parentContentControlOrNullObject;
             parentCC.load("tag");
             rangeEntries.push({ key, range, parentCC });
@@ -432,21 +428,19 @@ async function scanHeaderFooters() {
         try {
           const hfText = b.text || "";
           const hfMatches = hfText.match(/\{\{(\w+)\}\}/g) || [];
-          const hfPatterns = [...new Set(hfMatches)];
-          if (hfPatterns.length === 0) continue;
+          const hfKeys = [...new Set(hfMatches.map((m) => m.replace(/\{\{|\}\}/g, "").toLowerCase()))];
+          if (hfKeys.length === 0) continue;
 
           const hfSearches = {};
-          for (const pattern of hfPatterns) {
-            const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
-            hfSearches[pattern] = { key, results: b.search(pattern, { matchCase: false }) };
-            hfSearches[pattern].results.load("items");
+          for (const key of hfKeys) {
+            hfSearches[key] = b.search(`{{${key}}}`, { matchCase: false });
+            hfSearches[key].load("items");
           }
           await context.sync();
 
           const rangeEntries = [];
-          for (const pattern of hfPatterns) {
-            const { key, results } = hfSearches[pattern];
-            for (const range of results.items) {
+          for (const key of hfKeys) {
+            for (const range of hfSearches[key].items) {
               const parentCC = range.parentContentControlOrNullObject;
               parentCC.load("tag");
               rangeEntries.push({ key, range, parentCC });
@@ -1219,25 +1213,23 @@ async function checkForNewPlaceholders() {
       }
 
       // Check 2: search raw body patterns and convert any NOT inside CCs.
-      // Only set needsUpdate if we actually convert something new.
+      // Canonicalize to lowercase keys, search once per key with matchCase:false.
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
-      const rawPatterns = [...new Set(rawMatches)];
+      const rawKeys = [...new Set(rawMatches.map((m) => m.replace(/\{\{|\}\}/g, "").toLowerCase()))];
 
-      if (rawPatterns.length > 0) {
+      if (rawKeys.length > 0) {
         const searches = {};
-        for (const pattern of rawPatterns) {
-          const key = pattern.replace(/\{\{|\}\}/g, "").toLowerCase();
-          searches[pattern] = { key, results: body.search(pattern, { matchCase: false }) };
-          searches[pattern].results.load("items");
+        for (const key of rawKeys) {
+          searches[key] = body.search(`{{${key}}}`, { matchCase: false });
+          searches[key].load("items");
         }
         await context.sync();
 
         // Batch parent-CC checks
         const rangeEntries = [];
-        for (const pattern of rawPatterns) {
-          const { key, results } = searches[pattern];
-          for (const range of results.items) {
+        for (const key of rawKeys) {
+          for (const range of searches[key].items) {
             const parentCC = range.parentContentControlOrNullObject;
             parentCC.load("tag");
             rangeEntries.push({ key, range, parentCC });
