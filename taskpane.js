@@ -1499,10 +1499,9 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex) {
       <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else if (exactCount === 0) {
     // Only variant matches (selected text not found exact, but variants exist)
-    description = `Found <strong>${allCount} matches</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
     buttons = `
-      <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-      <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+      <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} match${allCount > 1 ? "es" : ""}</button>
       <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
   } else if (exactCount === 1 && variantCount > 0) {
     // 1 exact + variants
@@ -1551,9 +1550,6 @@ async function confirmReplace(mode) {
 
   try {
     let count = 0;
-    let createSkipped = 0;
-    const caseSensitive = mode === "exact"; // 'exact' = same capitalization only
-    const matchCase = mode !== "all"; // 'all' = case-insensitive, others = case-sensitive
 
     await Word.run(async (context) => {
       if (mode === "single") {
@@ -1572,7 +1568,7 @@ async function confirmReplace(mode) {
         await context.sync();
       } else {
         // 'exact' or 'all': replace multiple matches
-        const rawItems = await searchAllBodies(context, text, { matchCase });
+        const rawItems = await searchAllBodies(context, text, { matchCase: mode !== "all" });
         const items = await dedupeRanges(context, rawItems);
 
         for (const range of items) {
@@ -1589,12 +1585,6 @@ async function confirmReplace(mode) {
     });
     if (count > 0) {
       onPlaceholderCreated(name, count);
-      if (createSkipped > 0) {
-        showCreateStatus(
-          `Created {{${name}}} but ${createSkipped} region${createSkipped > 1 ? "s were" : " was"} skipped.`,
-          "info"
-        );
-      }
     }
   } catch (err) {
     showCreateStatus("Error: " + err.message, "error");
