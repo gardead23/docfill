@@ -1364,7 +1364,7 @@ async function fetchCurrentSelection() {
       lastSelectedOccurrenceIndex = -1;
 
       if (lastSelectedText && lastSelectedText.length > 0) {
-        const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: false });
+        const rawItems = await searchAllBodies(context, lastSelectedText, { matchCase: true });
         const items = await dedupeRanges(context, rawItems);
         if (items.length > 1) {
           for (let i = 0; i < items.length; i++) {
@@ -1429,33 +1429,42 @@ async function createPlaceholder() {
   hideCreateStatus();
 
   let shouldProceed = true;
-  let occurrenceCount = 0;
+  let exactCount = 0;
+  let allCount = 0;
 
   try {
     await Word.run(async (context) => {
-      const rawItems = await searchAllBodies(context, text, { matchCase: false });
-      const items = await dedupeRanges(context, rawItems);
-      occurrenceCount = items.length;
+      // Exact-case search
+      const exactRaw = await searchAllBodies(context, text, { matchCase: true });
+      const exactItems = await dedupeRanges(context, exactRaw);
+      exactCount = exactItems.length;
 
-      if (occurrenceCount === 0) { shouldProceed = false; return; }
+      // Case-insensitive search for variants
+      const allRaw = await searchAllBodies(context, text, { matchCase: false });
+      const allItems = await dedupeRanges(context, allRaw);
+      allCount = allItems.length;
 
-      if (occurrenceCount > 1) {
+      const variantCount = allCount - exactCount;
+
+      if (allCount === 0) { shouldProceed = false; return; }
+
+      if (exactCount === 1 && variantCount === 0) {
+        // Single exact match, no variants: replace immediately
+        const cc = exactItems[0].insertContentControl();
+        cc.tag = keyToCCTag(name);
+        cc.title = toTitleCase(name);
+        cc.appearance = Word.ContentControlAppearance.boundingBox;
+        cc.placeholderText = `{{${name}}}`;
+        cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
+        await context.sync();
+      } else {
+        // Multiple matches or variants: show confirmation
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
         pendingCreateIndex = lastSelectedOccurrenceIndex;
-        showReplaceAllConfirm(occurrenceCount, name, lastSelectedOccurrenceIndex);
-        return;
+        showReplaceAllConfirm(exactCount, allCount, name, lastSelectedOccurrenceIndex);
       }
-
-      // Single occurrence: replace text and wrap in DocFill CC
-      const cc = items[0].insertContentControl();
-      cc.tag = keyToCCTag(name);
-      cc.title = toTitleCase(name);
-      cc.appearance = Word.ContentControlAppearance.boundingBox;
-      cc.placeholderText = `{{${name}}}`;
-      cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
-      await context.sync();
     });
 
     if (!shouldProceed && occurrenceCount === 0) {
@@ -1471,24 +1480,62 @@ async function createPlaceholder() {
   btn.innerHTML = "Replace with Placeholder";
 }
 
-function showReplaceAllConfirm(count, name, selectedIndex) {
+function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex) {
   const el = document.getElementById("create-status");
-  const singleLabel = selectedIndex >= 0
-    ? `This occurrence (#${selectedIndex + 1})`
-    : "First occurrence only";
+  const variantCount = allCount - exactCount;
+  const btnStyle = 'flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px';
+  const cancelStyle = 'padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer';
+
+  let description;
+  let buttons;
+
+  if (variantCount === 0) {
+    // Only exact matches
+    description = `Found <strong>${exactCount} matches</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    const singleLabel = selectedIndex >= 0 ? `This one (#${selectedIndex + 1})` : "This one only";
+    buttons = `
+      <button onclick="confirmReplace('single')" style="${btnStyle}">${singleLabel}</button>
+      <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
+      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+  } else if (exactCount === 0) {
+    // Only variant matches (selected text not found exact, but variants exist)
+    description = `Found <strong>${allCount} matches</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    buttons = `
+      <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+      <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+  } else if (exactCount === 1 && variantCount > 0) {
+    // 1 exact + variants
+    description = `Found <strong>1</strong> "${escapeHtml(pendingCreateText)}" and <strong>${variantCount} more</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    buttons = `
+      <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+      <button onclick="confirmReplace('all')" style="${btnStyle}">Both matches</button>
+      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+    if (allCount > 2) {
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+        <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+        <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+    }
+  } else {
+    // Multiple exact + variants
+    description = `Found <strong>${exactCount}</strong> same-capitalization matches and <strong>${variantCount} more</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    buttons = `
+      <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+      <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} same-capitalization</button>
+      <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+  }
+
   el.innerHTML = `
-    <div style="margin-bottom:8px">Found <strong>${count} occurrences</strong> of this text. Replace with <code>{{${escapeHtml(name)}}}</code>?</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button onclick="confirmReplace(false)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">${singleLabel}</button>
-      <button onclick="confirmReplace(true)" style="flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px">All ${count} occurrences</button>
-      <button onclick="hideCreateStatus()" style="padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer">Cancel</button>
-    </div>
-  `;
+    <div style="margin-bottom:8px">${description}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
   el.className = "info";
   el.style.display = "block";
 }
 
-async function confirmReplace(replaceAll) {
+/** @param {'single'|'exact'|'all'} mode */
+async function confirmReplace(mode) {
   hideCreateStatus();
   const text = pendingCreateText;
   const name = pendingCreateName;
@@ -1505,10 +1552,27 @@ async function confirmReplace(replaceAll) {
   try {
     let count = 0;
     let createSkipped = 0;
+    const caseSensitive = mode === "exact"; // 'exact' = same capitalization only
+    const matchCase = mode !== "all"; // 'all' = case-insensitive, others = case-sensitive
+
     await Word.run(async (context) => {
-      if (replaceAll) {
-        // Search all bodies and dedupe linked ranges, then batch replacements
-        const rawItems = await searchAllBodies(context, text, { matchCase: false });
+      if (mode === "single") {
+        // Single occurrence: use exact-case search, pick the targeted index
+        const rawItems = await searchAllBodies(context, text, { matchCase: true });
+        const items = await dedupeRanges(context, rawItems);
+        if (items.length === 0) return;
+        const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
+        const cc = items[idx].insertContentControl();
+        cc.tag = keyToCCTag(name);
+        cc.title = toTitleCase(name);
+        cc.appearance = Word.ContentControlAppearance.boundingBox;
+        cc.placeholderText = `{{${name}}}`;
+        cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
+        count = 1;
+        await context.sync();
+      } else {
+        // 'exact' or 'all': replace multiple matches
+        const rawItems = await searchAllBodies(context, text, { matchCase });
         const items = await dedupeRanges(context, rawItems);
 
         for (const range of items) {
@@ -1521,19 +1585,6 @@ async function confirmReplace(replaceAll) {
         }
         count += items.length;
         if (count > 0) await context.sync();
-      } else {
-        const rawItems = await searchAllBodies(context, text, { matchCase: false });
-        const items = await dedupeRanges(context, rawItems);
-        if (items.length === 0) return;
-        const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
-        const cc = items[idx].insertContentControl();
-        cc.tag = keyToCCTag(name);
-        cc.title = toTitleCase(name);
-        cc.appearance = Word.ContentControlAppearance.boundingBox;
-        cc.placeholderText = `{{${name}}}`;
-        cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
-        count = 1;
-        await context.sync();
       }
     });
     if (count > 0) {
