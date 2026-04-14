@@ -1075,25 +1075,22 @@ function loadFieldConfigsWithMigration(fingerprintedKey, keys) {
   let data = loadFieldConfigs(fingerprintedKey);
   if (Object.keys(data).length > 0) return data;
 
-  // Try legacy key (no fingerprint)
-  if (documentFingerprint) {
-    const legacyKey = LS_PREFIX + [...keys].sort().join(",");
-    data = loadFieldConfigs(legacyKey);
-    if (Object.keys(data).length > 0) {
-      try { localStorage.setItem(fingerprintedKey, JSON.stringify(data)); } catch { /* ignore */ }
-      return data;
-    }
+  // Try legacy key (no fingerprint), both exact and lowercase
+  const legacyKey = LS_PREFIX + [...keys].sort().join(",");
+  data = loadFieldConfigs(legacyKey);
+  if (Object.keys(data).length > 0) {
+    try { localStorage.setItem(fingerprintedKey, JSON.stringify(data)); } catch { /* ignore */ }
+    return data;
   }
 
-  // Try case-insensitive scan of all localStorage keys for matching config
+  // Case-insensitive scan: check both fingerprinted and legacy targets
   try {
-    const lowerTarget = fingerprintedKey.toLowerCase();
+    const targets = [fingerprintedKey.toLowerCase(), legacyKey.toLowerCase()];
     for (let i = 0; i < localStorage.length; i++) {
       const lsKey = localStorage.key(i);
-      if (lsKey && lsKey.startsWith(LS_PREFIX) && lsKey.toLowerCase() === lowerTarget) {
+      if (lsKey && lsKey.startsWith(LS_PREFIX) && targets.includes(lsKey.toLowerCase())) {
         data = loadFieldConfigs(lsKey);
         if (Object.keys(data).length > 0) {
-          // Migrate to new lowercase key
           try { localStorage.setItem(fingerprintedKey, JSON.stringify(data)); } catch { /* ignore */ }
           return data;
         }
