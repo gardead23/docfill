@@ -1410,20 +1410,33 @@ async function fetchCurrentSelection() {
 function updateSelectionPreview(text) {
   const preview = document.getElementById("selection-preview");
   const nameInput = document.getElementById("placeholder-name-input");
+  const replaceBtn = document.getElementById("create-replace-btn");
   if (!preview || !nameInput) return;
+
   if (!text) {
+    // State 1: Idle -- lock everything
     preview.className = "selection-preview";
     preview.innerHTML = '<span class="selection-hint-text">Select text in your document to get started</span>';
+    nameInput.disabled = true;
+    nameInput.value = "";
+    if (replaceBtn) { replaceBtn.disabled = true; replaceBtn.classList.add("btn-disabled"); }
     return;
   }
+
+  // State 2: Active -- unlock and populate
   const display = text.length > 60 ? text.substring(0, 60) + "\u2026" : text;
   preview.className = "selection-preview has-selection";
   preview.innerHTML = `<span class="selection-label">Selected</span><span class="selection-text">"${escapeHtml(display)}"</span>`;
+
+  nameInput.disabled = false;
+  if (replaceBtn) { replaceBtn.disabled = false; replaceBtn.classList.remove("btn-disabled"); }
+
   const suggested = suggestPlaceholderName(text);
   if (!nameInput.value || nameInput.value === lastSuggestedName) {
     nameInput.value = suggested;
     lastSuggestedName = suggested;
   }
+  nameInput.focus();
 }
 
 function suggestPlaceholderName(text) {
@@ -1439,7 +1452,7 @@ async function createPlaceholder() {
   const nameInput = document.getElementById("placeholder-name-input");
   const name = nameInput.value.trim().toLowerCase();
 
-  if (!text) { showCreateStatus("Select some text in the document first.", "error"); return; }
+  if (!text) return; // Button should be disabled, but guard anyway
   if (!name) { showCreateStatus("Enter a placeholder name.", "error"); nameInput.focus(); return; }
   if (!/^\w+$/.test(name)) { showCreateStatus("Use only letters, numbers, and underscores.", "error"); return; }
 
@@ -1496,8 +1509,12 @@ async function createPlaceholder() {
     showCreateStatus("Error: " + err.message, "error");
   }
 
-  btn.disabled = false;
+  // Reset to State 1 (idle)
   btn.innerHTML = "Replace with Placeholder";
+  btn.disabled = true;
+  btn.classList.add("btn-disabled");
+  lastSelectedText = "";
+  updateSelectionPreview("");
 }
 
 function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex) {
@@ -1610,8 +1627,12 @@ async function confirmReplace(mode) {
     showCreateStatus("Error: " + err.message, "error");
   }
 
-  btn.disabled = false;
+  // Reset to State 1 (idle)
   btn.innerHTML = "Replace with Placeholder";
+  btn.disabled = true;
+  btn.classList.add("btn-disabled");
+  lastSelectedText = "";
+  updateSelectionPreview("");
 }
 
 function onPlaceholderCreated(name, count) {

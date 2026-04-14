@@ -519,6 +519,22 @@ footer#create-actions {
   background: #1d4ed8;
 }
 
+.btn-primary.btn-disabled,
+.btn-primary:disabled {
+  background: #d1d5db;
+  color: #9ca3af;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Disabled input */
+.field-value-input:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;

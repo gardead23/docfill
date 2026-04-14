@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DocFill</title>
-  <link rel="stylesheet" href="taskpane.css?v=88"/>
+  <link rel="stylesheet" href="taskpane.css?v=89"/>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
@@ -47,11 +47,12 @@
             spellcheck="false"
             autocorrect="off"
             autocapitalize="off"
+            disabled
           />
           <p class="create-field-hint">Letters, numbers, and underscores only</p>
         </div>
 
-        <button class="btn btn-primary" id="create-replace-btn" onclick="createPlaceholder()">
+        <button class="btn btn-primary btn-disabled" id="create-replace-btn" onclick="createPlaceholder()" disabled>
           Replace with Placeholder
         </button>
 
@@ -136,6 +137,6 @@
     </footer>
 
   </div>
-  <script src="taskpane.js?v=88"></script>
+  <script src="taskpane.js?v=89"></script>
 </body>
 </html>
