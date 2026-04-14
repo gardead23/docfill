@@ -270,7 +270,7 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 - **Incremental check on tab switch:** `checkForNewPlaceholders()` uses body text + CC comparison -- no HF loading. Only re-renders if changes detected.
 - **Fill is CC-only:** Two syncs total (load collections + apply updates) regardless of field count. No text search involved.
 - **DOM reorder preserves drafts:** Sort and filter move DOM nodes without destroying/rebuilding them.
-- **Background HF scan fires only on first scan or when new body keys found.**
+- **Full Scan Document runs deferred HF scan every time; tab-switch incremental checks are body-only.**
 
 ## Known Limitations
 
