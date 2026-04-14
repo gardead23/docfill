@@ -528,9 +528,16 @@ let fillFilterText = "";
 
 function setFillSort(mode) {
   fillSortMode = mode;
-  document.getElementById("sort-doc")?.classList.toggle("active", mode === "doc");
-  document.getElementById("sort-az")?.classList.toggle("active", mode === "az");
+  const btn = document.getElementById("fill-sort-btn");
+  if (btn) {
+    btn.classList.toggle("active", mode === "az");
+    btn.title = mode === "az" ? "Sort: Alphabetical" : "Sort: Document order";
+  }
   renderForm(currentFields);
+}
+
+function toggleFillSort() {
+  setFillSort(fillSortMode === "doc" ? "az" : "doc");
 }
 
 function filterFillFields(query) {
