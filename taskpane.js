@@ -1682,7 +1682,7 @@ function renderCreatedList(filter) {
     <div class="created-row" onclick="navigateToChip('${escapeAttr(e.name)}')">
       <span class="created-row-name">{{${escapeHtml(e.name)}}}</span>
       <span class="created-row-right">
-        <button class="created-row-action delete" onclick="event.stopPropagation(); confirmDeletePlaceholder('${escapeAttr(e.name)}')">&#128465;</button>
+        <button class="created-row-remove" onclick="event.stopPropagation(); confirmDeletePlaceholder('${escapeAttr(e.name)}')">&times;</button>
         <span class="created-row-badge">${e.count}</span>
       </span>
     </div>`).join("");

@@ -803,39 +803,36 @@ footer#create-actions {
   text-align: center;
 }
 
-/* Trash button hidden by default, appears on hover to the left of badge */
-.created-row-action.delete {
-  display: none;
-}
-.created-row:hover .created-row-action.delete {
-  display: inline-flex;
-}
-/* Always show on touch devices */
-@media (hover: none) {
-  .created-row-action.delete {
-    display: inline-flex;
-  }
+/* Remove (x) button -- invisible by default, fades in on row hover */
+.created-row-remove {
+  background: none;
+  border: none;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: #9ca3af;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.1s, background 0.1s;
 }
 
-.created-row-action {
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 3px 6px;
-  font-size: 11px;
-  color: #6b7280;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+/* Row hover: show the x in neutral gray */
+.created-row:hover .created-row-remove {
+  opacity: 1;
 }
-.created-row-action:hover {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #bfdbfe;
-}
-.created-row-action.delete:hover {
-  background: #fef2f2;
+
+/* Action hover: x turns red with faint red background */
+.created-row-remove:hover {
   color: #dc2626;
-  border-color: #fecaca;
+  background: #fee2e2;
+}
+
+/* Touch devices: always show */
+@media (hover: none) {
+  .created-row-remove {
+    opacity: 1;
+  }
 }
 
 /* ── Done Button ── */
