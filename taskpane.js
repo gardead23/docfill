@@ -1467,14 +1467,32 @@ async function createPlaceholder() {
 
   try {
     await Word.run(async (context) => {
-      // Exact-case search
+      // Exact-case search, filtering out ranges inside existing CCs
       const exactRaw = await searchAllBodies(context, text, { matchCase: true });
-      const exactItems = await dedupeRanges(context, exactRaw);
+      const exactDeduped = await dedupeRanges(context, exactRaw);
+
+      // Check parent CCs for exact matches
+      for (const r of exactDeduped) {
+        r.parentContentControlOrNullObject.load("tag");
+      }
+      await context.sync();
+      const exactItems = exactDeduped.filter((r) => {
+        const p = r.parentContentControlOrNullObject;
+        return p.isNullObject || !p.tag || !p.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
       exactCount = exactItems.length;
 
-      // Case-insensitive search for variants
+      // Case-insensitive search for variants, also filtering
       const allRaw = await searchAllBodies(context, text, { matchCase: false });
-      const allItems = await dedupeRanges(context, allRaw);
+      const allDeduped = await dedupeRanges(context, allRaw);
+      for (const r of allDeduped) {
+        r.parentContentControlOrNullObject.load("tag");
+      }
+      await context.sync();
+      const allItems = allDeduped.filter((r) => {
+        const p = r.parentContentControlOrNullObject;
+        return p.isNullObject || !p.tag || !p.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
       allCount = allItems.length;
 
       const variantCount = allCount - exactCount;
@@ -1591,26 +1609,36 @@ async function confirmReplace(mode) {
     let count = 0;
 
     await Word.run(async (context) => {
+      const matchCase = mode === "single" || mode === "exact";
+      const rawItems = await searchAllBodies(context, text, { matchCase });
+      const items = await dedupeRanges(context, rawItems);
+      if (items.length === 0) return;
+
+      // Check parent CCs to skip ranges already inside DocFill controls
+      for (const range of items) {
+        const parentCC = range.parentContentControlOrNullObject;
+        parentCC.load("tag");
+      }
+      await context.sync();
+
+      const freeRanges = items.filter((range) => {
+        const parentCC = range.parentContentControlOrNullObject;
+        return parentCC.isNullObject || !parentCC.tag || !parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
+
+      if (freeRanges.length === 0) return;
+
       if (mode === "single") {
-        // Single occurrence: use exact-case search, pick the targeted index
-        const rawItems = await searchAllBodies(context, text, { matchCase: true });
-        const items = await dedupeRanges(context, rawItems);
-        if (items.length === 0) return;
-        const idx = (targetIndex >= 0 && targetIndex < items.length) ? targetIndex : 0;
-        const cc = items[idx].insertContentControl();
+        const idx = (targetIndex >= 0 && targetIndex < freeRanges.length) ? targetIndex : 0;
+        const cc = freeRanges[idx].insertContentControl();
         cc.tag = keyToCCTag(name);
         cc.title = toTitleCase(name);
         cc.appearance = Word.ContentControlAppearance.boundingBox;
         cc.placeholderText = `{{${name}}}`;
         cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         count = 1;
-        await context.sync();
       } else {
-        // 'exact' or 'all': replace multiple matches
-        const rawItems = await searchAllBodies(context, text, { matchCase: mode !== "all" });
-        const items = await dedupeRanges(context, rawItems);
-
-        for (const range of items) {
+        for (const range of freeRanges) {
           const cc = range.insertContentControl();
           cc.tag = keyToCCTag(name);
           cc.title = toTitleCase(name);
@@ -1618,9 +1646,9 @@ async function confirmReplace(mode) {
           cc.placeholderText = `{{${name}}}`;
           cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         }
-        count += items.length;
-        if (count > 0) await context.sync();
+        count = freeRanges.length;
       }
+      await context.sync();
     });
     if (count > 0) {
       onPlaceholderCreated(name, count);
