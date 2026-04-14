@@ -1279,7 +1279,19 @@ async function checkForNewPlaceholders() {
       }
 
       const allKeys = Object.keys(ccMap);
-      if (allKeys.length === 0) return;
+      if (allKeys.length === 0) {
+        // No DocFill fields remain -- clear state and show empty state
+        currentFields = [];
+        currentStorageKey = "";
+        lastFilledValues = {};
+        hasFilled = false;
+        document.getElementById("fields-section").style.display = "none";
+        document.getElementById("actions").style.display = "none";
+        document.getElementById("empty-state").style.display = "block";
+        document.querySelector(".empty-desc").innerHTML =
+          'No <code>{{placeholders}}</code> found. Add fields like <code>{{client_name}}</code> to your document, then scan again.';
+        return;
+      }
 
       lastFilledValues = {};
       for (const [key, data] of Object.entries(ccMap)) {
