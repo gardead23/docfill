@@ -1150,44 +1150,122 @@ function switchTab(tab) {
   }
 }
 
-/** Quick check for new placeholders (raw text or CCs not in form). Triggers scan only if found. */
+/**
+ * Quick check for new placeholders. If found, does a fast body-only
+ * scan (converts new raw text, rebuilds form from CCs). No HF loading.
+ */
 async function checkForNewPlaceholders() {
   try {
-    let foundNew = false;
     await Word.run(async (context) => {
       const body = context.document.body;
       body.load("text");
       const allCCs = context.document.contentControls;
-      allCCs.load("items,tag");
+      allCCs.load("items,tag,text");
       await context.sync();
 
+      // Build CC key set
       const ccKeys = new Set();
       for (const cc of allCCs.items) {
         if (isDocFillCC(cc)) ccKeys.add(ccTagToKey(cc.tag));
       }
 
-      // Check 1: raw {{key}} in body text not covered by CCs
+      // Check if anything changed since last render
+      const currentKeys = new Set(currentFields.map((f) => f.key));
+      let needsUpdate = false;
+
+      // Check 1: CCs not in current field list (created via Create tab)
+      for (const key of ccKeys) {
+        if (!currentKeys.has(key)) { needsUpdate = true; break; }
+      }
+
+      // Check 2: raw {{key}} in body not covered by CCs
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
+      const newRawKeys = [];
       for (const m of rawMatches) {
         const key = m.replace(/\{\{|\}\}/g, "");
-        if (!ccKeys.has(key)) { foundNew = true; break; }
-      }
-
-      // Check 2: CCs exist that aren't in the current field list
-      // (e.g., created via Create tab since last scan)
-      if (!foundNew) {
-        const currentKeys = new Set(currentFields.map((f) => f.key));
-        for (const key of ccKeys) {
-          if (!currentKeys.has(key)) { foundNew = true; break; }
+        if (!ccKeys.has(key)) {
+          newRawKeys.push(key);
+          needsUpdate = true;
         }
       }
-    });
 
-    if (foundNew) {
-      hasScannedOnce = false;
-      scanDocument();
-    }
+      if (!needsUpdate) return;
+
+      // Convert any new raw body placeholders to CCs (fast, body only)
+      if (newRawKeys.length > 0) {
+        const searches = {};
+        for (const key of newRawKeys) {
+          searches[key] = body.search(`{{${key}}}`, { matchCase: true });
+          searches[key].load("items");
+        }
+        await context.sync();
+
+        // Batch parent-CC checks
+        const rangeEntries = [];
+        for (const key of newRawKeys) {
+          for (const range of searches[key].items) {
+            const parentCC = range.parentContentControlOrNullObject;
+            parentCC.load("tag");
+            rangeEntries.push({ key, range, parentCC });
+          }
+        }
+        if (rangeEntries.length > 0) {
+          await context.sync();
+          let converted = false;
+          for (const { key, range, parentCC } of rangeEntries) {
+            const insideExisting = !parentCC.isNullObject &&
+              parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
+            if (!insideExisting) {
+              convertRangeToCC(range, key);
+              converted = true;
+            }
+          }
+          if (converted) await context.sync();
+        }
+
+        // Reload CCs after conversion
+        allCCs.load("items,tag,text");
+        await context.sync();
+      }
+
+      // Rebuild form from all CCs (same as Phase C of scanDocument)
+      const ccMap = {};
+      for (const cc of allCCs.items) {
+        if (!isDocFillCC(cc)) continue;
+        const key = ccTagToKey(cc.tag);
+        if (!ccMap[key]) ccMap[key] = { items: [], text: cc.text };
+        ccMap[key].items.push(cc);
+      }
+
+      const allKeys = Object.keys(ccMap);
+      if (allKeys.length === 0) return;
+
+      lastFilledValues = {};
+      for (const [key, data] of Object.entries(ccMap)) {
+        const text = data.text.trim();
+        if (text && text !== `{{${key}}}`) lastFilledValues[key] = data.text;
+      }
+      hasFilled = Object.keys(lastFilledValues).length > 0;
+
+      const keys = allKeys;
+      currentStorageKey = buildStorageKey(keys);
+      const saved = loadFieldConfigsWithMigration(currentStorageKey, keys);
+      currentFields = keys.map((key) => {
+        const savedType = saved[key]?.type === "number" ? "text" : saved[key]?.type;
+        return {
+          key,
+          label: saved[key]?.label || toTitleCase(key),
+          type: savedType || guessFieldType(key),
+          dateFormat: saved[key]?.dateFormat,
+        };
+      });
+      saveFieldConfigs(currentStorageKey, currentFields);
+      renderForm(currentFields);
+
+      const fieldsSection = document.getElementById("fields-section");
+      if (fieldsSection) fieldsSection.scrollIntoView({ behavior: "instant", block: "start" });
+    });
   } catch {
     // Best effort
   }
