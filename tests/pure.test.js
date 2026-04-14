@@ -14,6 +14,7 @@ import {
   keyToCCTag,
   placeholderText,
   isPlaceholderText,
+  isPlaceholderTextForKey,
   isCCUnfilled,
 } from "../lib/pure.mjs";
 
@@ -289,6 +290,22 @@ describe("isPlaceholderText", () => {
   });
 });
 
+describe("isPlaceholderTextForKey", () => {
+  it("matches same key case-insensitively", () => {
+    expect(isPlaceholderTextForKey("{{client_name}}", "client_name")).toBe(true);
+    expect(isPlaceholderTextForKey("{{ClientName}}", "clientname")).toBe(true);
+    expect(isPlaceholderTextForKey("{{CLIENT_NAME}}", "client_name")).toBe(true);
+  });
+
+  it("returns false for different key", () => {
+    expect(isPlaceholderTextForKey("{{other_key}}", "client_name")).toBe(false);
+  });
+
+  it("returns false for non-placeholder text", () => {
+    expect(isPlaceholderTextForKey("Acme Corp", "client_name")).toBe(false);
+  });
+});
+
 describe("isCCUnfilled", () => {
   it("returns true when text matches placeholder", () => {
     expect(isCCUnfilled("{{client_name}}", "client_name")).toBe(true);
@@ -310,8 +327,7 @@ describe("isCCUnfilled", () => {
     expect(isCCUnfilled("Acme Corp", "client_name")).toBe(false);
   });
 
-  it("returns true when text is any placeholder pattern", () => {
-    // Any {{word}} text is treated as unfilled, regardless of key match
-    expect(isCCUnfilled("{{other_key}}", "client_name")).toBe(true);
+  it("returns false when text is a different key's placeholder", () => {
+    expect(isCCUnfilled("{{other_key}}", "client_name")).toBe(false);
   });
 });

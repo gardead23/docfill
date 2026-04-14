@@ -24,6 +24,12 @@ function isPlaceholderText(text) {
   return /^\{\{\w+\}\}$/.test(text.trim());
 }
 
+/** Check if text is a placeholder for a specific key (case-insensitive). */
+function isPlaceholderTextForKey(text, key) {
+  const m = text.trim().match(/^\{\{(\w+)\}\}$/);
+  return m !== null && m[1].toLowerCase() === key.toLowerCase();
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 /** @type {{ key: string, label: string, type: string, dateFormat?: string }[]} */
@@ -330,8 +336,8 @@ async function scanDocument() {
       lastFilledValues = {};
       for (const [key, data] of Object.entries(ccMap)) {
         const text = data.text.trim();
-        // A CC is "filled" if its text is not a placeholder pattern (case-insensitive)
-        if (text && !isPlaceholderText(text)) {
+        // A CC is "filled" if its text is not its own placeholder pattern
+        if (text && !isPlaceholderTextForKey(text, key)) {
           lastFilledValues[key] = data.text;
         }
       }
@@ -490,7 +496,7 @@ async function scanHeaderFooters() {
         // Hydrate filled values
         for (const [key, data] of Object.entries(ccMap)) {
           const text = data.text.trim();
-          if (text && !isPlaceholderText(text)) {
+          if (text && !isPlaceholderTextForKey(text, key)) {
             lastFilledValues[key] = data.text;
           }
         }
@@ -1068,6 +1074,8 @@ function buildStorageKey(keys) {
 function loadFieldConfigsWithMigration(fingerprintedKey, keys) {
   let data = loadFieldConfigs(fingerprintedKey);
   if (Object.keys(data).length > 0) return data;
+
+  // Try legacy key (no fingerprint)
   if (documentFingerprint) {
     const legacyKey = LS_PREFIX + [...keys].sort().join(",");
     data = loadFieldConfigs(legacyKey);
@@ -1076,6 +1084,23 @@ function loadFieldConfigsWithMigration(fingerprintedKey, keys) {
       return data;
     }
   }
+
+  // Try case-insensitive scan of all localStorage keys for matching config
+  try {
+    const lowerTarget = fingerprintedKey.toLowerCase();
+    for (let i = 0; i < localStorage.length; i++) {
+      const lsKey = localStorage.key(i);
+      if (lsKey && lsKey.startsWith(LS_PREFIX) && lsKey.toLowerCase() === lowerTarget) {
+        data = loadFieldConfigs(lsKey);
+        if (Object.keys(data).length > 0) {
+          // Migrate to new lowercase key
+          try { localStorage.setItem(fingerprintedKey, JSON.stringify(data)); } catch { /* ignore */ }
+          return data;
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
   return {};
 }
 
@@ -1196,17 +1221,12 @@ async function checkForNewPlaceholders() {
         if (!currentKeys.has(key)) { needsUpdate = true; break; }
       }
 
-      // Check 2: raw {{key}} in body -- search ALL patterns, not just new keys.
-      // Parent-CC check will skip ranges already inside CCs.
+      // Check 2: search raw body patterns and convert any NOT inside CCs.
+      // Only set needsUpdate if we actually convert something new.
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
       const rawPatterns = [...new Set(rawMatches)];
-      // Any raw pattern means we might have unconverted occurrences
-      if (rawPatterns.length > 0) needsUpdate = true;
 
-      if (!needsUpdate) return;
-
-      // Convert any raw body placeholders to CCs (fast, body only)
       if (rawPatterns.length > 0) {
         const searches = {};
         for (const pattern of rawPatterns) {
@@ -1228,22 +1248,28 @@ async function checkForNewPlaceholders() {
         }
         if (rangeEntries.length > 0) {
           await context.sync();
-          let converted = false;
           for (const { key, range, parentCC } of rangeEntries) {
             const insideExisting = !parentCC.isNullObject &&
               parentCC.tag && parentCC.tag.startsWith(DOCFILL_TAG_PREFIX);
             if (!insideExisting) {
               convertRangeToCC(range, key);
-              converted = true;
+              needsUpdate = true; // only rerender if we actually converted something
             }
           }
-          if (converted) await context.sync();
+          if (needsUpdate) await context.sync();
         }
 
-        // Reload CCs after conversion
-        allCCs.load("items,tag,text");
-        await context.sync();
+        if (needsUpdate) {
+          // Reload CCs after conversion
+          allCCs.load("items,tag,text");
+          await context.sync();
+        }
       }
+
+      if (!needsUpdate) return;
+
+      // Preserve draft values before rerendering
+      const draftValues = collectRawDrafts();
 
       // Rebuild form from all CCs (same as Phase C of scanDocument)
       const ccMap = {};
@@ -1260,7 +1286,7 @@ async function checkForNewPlaceholders() {
       lastFilledValues = {};
       for (const [key, data] of Object.entries(ccMap)) {
         const text = data.text.trim();
-        if (text && !isPlaceholderText(text)) lastFilledValues[key] = data.text;
+        if (text && !isPlaceholderTextForKey(text, key)) lastFilledValues[key] = data.text;
       }
       hasFilled = Object.keys(lastFilledValues).length > 0;
 
@@ -1278,6 +1304,7 @@ async function checkForNewPlaceholders() {
       });
       saveFieldConfigs(currentStorageKey, currentFields);
       renderForm(currentFields);
+      restoreRawDrafts(draftValues);
 
       const fieldsSection = document.getElementById("fields-section");
       if (fieldsSection) fieldsSection.scrollIntoView({ behavior: "instant", block: "start" });
