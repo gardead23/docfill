@@ -1153,7 +1153,7 @@ function switchTab(tab) {
   }
 }
 
-/** Quick check for new raw placeholders in body. Triggers scan only if found. */
+/** Quick check for new placeholders (raw text or CCs not in form). Triggers scan only if found. */
 async function checkForNewPlaceholders() {
   try {
     let foundNew = false;
@@ -1164,23 +1164,31 @@ async function checkForNewPlaceholders() {
       allCCs.load("items,tag");
       await context.sync();
 
-      // Find keys with CCs
       const ccKeys = new Set();
       for (const cc of allCCs.items) {
         if (isDocFillCC(cc)) ccKeys.add(ccTagToKey(cc.tag));
       }
 
-      // Check body text for raw {{key}} not covered by CCs
+      // Check 1: raw {{key}} in body text not covered by CCs
       const bodyText = body.text || "";
       const rawMatches = bodyText.match(/\{\{(\w+)\}\}/g) || [];
       for (const m of rawMatches) {
         const key = m.replace(/\{\{|\}\}/g, "");
         if (!ccKeys.has(key)) { foundNew = true; break; }
       }
+
+      // Check 2: CCs exist that aren't in the current field list
+      // (e.g., created via Create tab since last scan)
+      if (!foundNew) {
+        const currentKeys = new Set(currentFields.map((f) => f.key));
+        for (const key of ccKeys) {
+          if (!currentKeys.has(key)) { foundNew = true; break; }
+        }
+      }
     });
 
     if (foundNew) {
-      hasScannedOnce = false; // allow full scan
+      hasScannedOnce = false;
       scanDocument();
     }
   } catch {
