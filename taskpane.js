@@ -1499,8 +1499,14 @@ async function createPlaceholder() {
 
       if (allCount === 0) { shouldProceed = false; return; }
 
-      if (exactCount === 1 && variantCount === 0) {
-        // Single exact match, no variants: replace immediately
+      // Check for existing CCs for this key
+      const existingCCs = context.document.contentControls.getByTag(keyToCCTag(name));
+      existingCCs.load("items");
+      await context.sync();
+      const existingCount = existingCCs.items.length;
+
+      if (exactCount === 1 && variantCount === 0 && existingCount === 0) {
+        // Single exact match, no variants, no existing CCs: replace immediately
         const cc = exactItems[0].insertContentControl();
         cc.tag = keyToCCTag(name);
         cc.title = toTitleCase(name);
@@ -1509,13 +1515,7 @@ async function createPlaceholder() {
         cc.insertText(`{{${name}}}`, Word.InsertLocation.replace);
         await context.sync();
       } else {
-        // Count existing CCs for this key
-        const existingCCs = context.document.contentControls.getByTag(keyToCCTag(name));
-        existingCCs.load("items");
-        await context.sync();
-        const existingCount = existingCCs.items.length;
-
-        // Multiple matches or variants: show confirmation
+        // Multiple matches, variants, or existing CCs: show confirmation
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
@@ -1556,8 +1556,14 @@ function showReplaceAllConfirm(exactCount, allCount, name, selectedIndex, existi
     ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. These new matches will be linked to it.</div>`
     : "";
 
-  if (variantCount === 0) {
-    // Only exact matches
+  if (allCount === 1) {
+    // Single match (only showing because existing CCs exist)
+    description = `Found <strong>1 match</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+    buttons = `
+      <button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
+      <button onclick="hideCreateStatus()" style="${cancelStyle}">Cancel</button>`;
+  } else if (variantCount === 0) {
+    // Multiple exact matches only
     description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
     const singleLabel = selectedIndex >= 0 ? `This one (#${selectedIndex + 1})` : "This one only";
     buttons = `
