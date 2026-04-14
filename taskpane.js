@@ -24,6 +24,8 @@ function keyToCCTag(key) {
 let currentFields = [];
 let currentStorageKey = "";
 let hasFilled = false;
+/** True after at least one full scan (body + HF) has completed. */
+let hasScannedOnce = false;
 /** @type {Record<string, string>} */
 let lastFilledValues = {};
 
@@ -381,6 +383,7 @@ async function scanDocument() {
     scanHeaderFooters().then(() => {
       if (hfStatusEl) hfStatusEl.style.display = "none";
       if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+      hasScannedOnce = true;
     });
   } finally {
     scanInProgress = false;
@@ -1140,8 +1143,10 @@ function switchTab(tab) {
     if (currentFields.length > 0) {
       document.getElementById("actions").style.display = "flex";
     }
-    // Auto-rescan to pick up any new placeholders added since last scan
-    scanDocument();
+    // Only auto-scan on first visit; user clicks Rescan for subsequent scans
+    if (!hasScannedOnce) {
+      scanDocument();
+    }
   }
 }
 
@@ -1152,9 +1157,8 @@ async function initCreateTab() {
   // Show placeholders immediately from body text (fast)
   await loadExistingPlaceholders();
 
-  // Kick off full document scan if not already done.
-  // This converts raw {{text}} to CCs and scans headers/footers.
-  const needsScan = !scanInProgress && !hfScanInProgress;
+  // Kick off full document scan only if not already done.
+  const needsScan = !hasScannedOnce && !scanInProgress && !hfScanInProgress;
   const hfRunning = hfScanInProgress;
 
   if (needsScan || hfRunning) {
