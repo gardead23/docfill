@@ -2066,6 +2066,7 @@ async function deleteCreatedPlaceholder(name) {
 
 let suppressionTimer = null;
 let chipNavGeneration = 0;
+let statusPreserveTimer = null;
 let scrollLockRaf = null;
 let scrollLockTimers = [];
 
@@ -2135,11 +2136,13 @@ async function navigateToChip(name) {
     statusEl.className = "";
     statusEl.style.height = h + "px";
     statusEl.style.visibility = "hidden";
-    // Release reserved space after scroll lock ends
-    setTimeout(() => {
-      statusEl.style.height = "";
-      statusEl.style.visibility = "";
-      statusEl.style.display = "none";
+    statusPreserveTimer = setTimeout(() => {
+      // Only release if still empty/hidden (newer status hasn't taken over)
+      if (!statusEl.innerHTML && statusEl.style.visibility === "hidden") {
+        statusEl.style.height = "";
+        statusEl.style.visibility = "";
+        statusEl.style.display = "none";
+      }
     }, 1600);
   }
   const nameInput = document.getElementById("placeholder-name-input");
@@ -2223,9 +2226,11 @@ function switchToFill() {
 // ── Create Status ──────────────────────────────────────────────────────────────
 
 
-/** Prepare #create-status for new content. */
+/** Prepare #create-status for new content: cancel any pending preserve timer. */
 function prepareCreateStatus() {
+  clearTimeout(statusPreserveTimer);
   const el = document.getElementById("create-status");
+  if (el) { el.style.height = ""; el.style.visibility = ""; }
   return el;
 }
 
@@ -2255,6 +2260,7 @@ function cancelCreateAction() {
 }
 
 function hideCreateStatus() {
+  clearTimeout(statusPreserveTimer);
   const el = document.getElementById("create-status");
-  if (el) el.style.display = "none";
+  if (el) { el.style.display = "none"; el.style.height = ""; el.style.visibility = ""; }
 }
