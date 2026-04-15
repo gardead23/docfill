@@ -2069,6 +2069,10 @@ let suppressionTimer = null;
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
 
+  // Save scroll position to restore after navigation
+  const scrollContainer = document.querySelector("main");
+  const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+
   // Clear any stale Create action state
   pendingCreateText = "";
   pendingCreateName = "";
@@ -2119,8 +2123,12 @@ async function navigateToChip(name) {
   } catch (err) {
     showChipToast("Error: " + err.message);
   } finally {
+    // Restore scroll position (cc.select() or DOM changes may have scrolled the task pane)
+    if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
+    // Also restore on a short delay in case async events cause scroll
+    setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50);
+    setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150);
     // Re-enable selection preview after a short delay
-    // (Word's selection change event fires after cc.select())
     suppressionTimer = setTimeout(() => { suppressSelectionPreview = false; }, 500);
   }
 }
