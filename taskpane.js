@@ -2127,8 +2127,7 @@ async function navigateToChip(name) {
   lastSelectedText = "";
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
-  // Clear status content without layout shift: preserve height during scroll lock, then hide
-  clearCreateStatusDeferred();
+  clearCreateStatus();
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
@@ -2209,24 +2208,17 @@ function switchToFill() {
 
 // ── Create Status ──────────────────────────────────────────────────────────────
 
-let createStatusClearTimer = null;
-
-/** Clear status content without layout shift, then hide after delay. */
-function clearCreateStatusDeferred() {
-  clearTimeout(createStatusClearTimer);
+/** Clear and hide #create-status immediately. */
+function clearCreateStatus() {
   const el = document.getElementById("create-status");
   if (!el || el.style.display === "none") return;
-  // Clear content immediately (removes stale buttons)
   el.innerHTML = "";
-  // Hide immediately -- the empty element has no height anyway
   el.style.display = "none";
 }
 
-/** Prepare #create-status for new content: cancel deferred clear, reset minHeight. */
+/** Prepare #create-status for new content. */
 function prepareCreateStatus() {
-  clearTimeout(createStatusClearTimer);
   const el = document.getElementById("create-status");
-  if (el) el.style.minHeight = "";
   return el;
 }
 
@@ -2256,7 +2248,6 @@ function cancelCreateAction() {
 }
 
 function hideCreateStatus() {
-  clearTimeout(createStatusClearTimer);
   const el = document.getElementById("create-status");
-  if (el) { el.style.display = "none"; el.style.minHeight = ""; }
+  if (el) el.style.display = "none";
 }
