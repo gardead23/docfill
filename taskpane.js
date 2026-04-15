@@ -222,26 +222,44 @@ async function sortKeysByDocumentOrder(context, ccMap) {
     }
   }
 
-  // Find earliest CC per multi-occurrence key (one sync)
+  // Find earliest CC per multi-occurrence key using pairwise comparison (one sync)
   if (multiKeys.length > 0) {
     const withinComps = [];
     for (const key of multiKeys) {
       const items = ccMap[key].items;
-      for (let i = 1; i < items.length; i++) {
-        withinComps.push({
-          key, i,
-          result: representative[key].getRange().compareLocationWith(items[i].getRange())
-        });
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          withinComps.push({
+            key, i, j,
+            result: items[i].getRange().compareLocationWith(items[j].getRange())
+          });
+        }
       }
     }
     await context.sync();
 
-    for (const { key, i, result } of withinComps) {
+    // Score each occurrence: higher = comes before more siblings
+    const scores = {};
+    for (const key of multiKeys) {
+      scores[key] = new Array(ccMap[key].items.length).fill(0);
+    }
+    for (const { key, i, j, result } of withinComps) {
       const v = result.value;
-      if (v === "After" || v === "AdjacentAfter" ||
-          v === Word.LocationRelation.after || v === Word.LocationRelation.adjacentAfter) {
-        representative[key] = ccMap[key].items[i];
+      if (v === "Before" || v === "AdjacentBefore" ||
+          v === Word.LocationRelation.before || v === Word.LocationRelation.adjacentBefore) {
+        scores[key][i]++;
+      } else if (v === "After" || v === "AdjacentAfter" ||
+                 v === Word.LocationRelation.after || v === Word.LocationRelation.adjacentAfter) {
+        scores[key][j]++;
       }
+    }
+    // Pick the occurrence with the highest score (earliest)
+    for (const key of multiKeys) {
+      let bestIdx = 0;
+      for (let i = 1; i < scores[key].length; i++) {
+        if (scores[key][i] > scores[key][bestIdx]) bestIdx = i;
+      }
+      representative[key] = ccMap[key].items[bestIdx];
     }
   }
 
