@@ -2129,6 +2129,7 @@ async function navigateToChip(name) {
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
   // Preserve layout while removing stale actionable content
+  clearTimeout(statusPreserveTimer);
   const statusEl = document.getElementById("create-status");
   if (statusEl && statusEl.style.display !== "none" && statusEl.innerHTML) {
     const h = statusEl.offsetHeight;
