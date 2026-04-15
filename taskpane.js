@@ -2127,7 +2127,9 @@ async function navigateToChip(name) {
   lastSelectedText = "";
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
-  clearCreateStatus();
+  // Clear status content but keep element visible to prevent layout shift
+  const statusEl = document.getElementById("create-status");
+  if (statusEl) statusEl.innerHTML = "";
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
