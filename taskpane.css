@@ -947,27 +947,14 @@ footer#create-actions {
 }
 
 /* List row */
-#created-list-section {
-  cursor: default;
-}
-
-.created-list-scroll {
-  cursor: pointer !important;
-}
-
 .created-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  cursor: pointer !important;
+  cursor: pointer;
   transition: background 0.1s;
   border-bottom: 1px solid #f3f4f6;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.created-row * {
-  cursor: inherit !important;
 }
 .created-row:last-child {
   border-bottom: none;
