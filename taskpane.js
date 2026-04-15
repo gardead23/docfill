@@ -2079,7 +2079,7 @@ async function navigateToChip(name) {
   clearTimeout(selectionDebounceTimer);
   // Disable controls to prevent stale actions, but don't touch DOM layout
   const nameInput = document.getElementById("placeholder-name-input");
-  if (nameInput) nameInput.disabled = true;
+  if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
   if (replaceBtn) { replaceBtn.disabled = true; replaceBtn.classList.add("btn-disabled"); }
 
