@@ -2127,16 +2127,15 @@ async function navigateToChip(name) {
   } catch (err) {
     showChipToast("Error: " + err.message);
   } finally {
-    // Only restore scroll if this is still the latest navigation
+    // Only restore scroll and release suppression if this is still the latest navigation
     if (myNavGeneration === chipNavGeneration) {
       scrollRestoreTimers.forEach(clearTimeout);
       scrollRestoreTimers = [];
       if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
       scrollRestoreTimers.push(setTimeout(() => { if (myNavGeneration === chipNavGeneration && scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50));
       scrollRestoreTimers.push(setTimeout(() => { if (myNavGeneration === chipNavGeneration && scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150));
+      suppressionTimer = setTimeout(() => { if (myNavGeneration === chipNavGeneration) suppressSelectionPreview = false; }, 500);
     }
-    // Re-enable selection preview after a short delay
-    suppressionTimer = setTimeout(() => { suppressSelectionPreview = false; }, 500);
   }
 }
 
