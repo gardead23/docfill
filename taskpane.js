@@ -2059,9 +2059,21 @@ async function deleteCreatedPlaceholder(name) {
   }
 }
 
+let suppressionTimer = null;
+
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
+
+  // Clear any stale Create selection/action state
+  pendingCreateText = "";
+  pendingCreateName = "";
+  lastSelectedText = "";
+  lastSuggestedName = "";
+  hideCreateStatus();
+  updateSelectionPreview("");
+
   suppressSelectionPreview = true;
+  clearTimeout(suppressionTimer);
   try {
     await Word.run(async (context) => {
       const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
@@ -2097,7 +2109,7 @@ async function navigateToChip(name) {
   } finally {
     // Re-enable selection preview after a short delay
     // (Word's selection change event fires after cc.select())
-    setTimeout(() => { suppressSelectionPreview = false; }, 500);
+    suppressionTimer = setTimeout(() => { suppressSelectionPreview = false; }, 500);
   }
 }
 
