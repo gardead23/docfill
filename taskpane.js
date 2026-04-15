@@ -2066,13 +2066,16 @@ async function deleteCreatedPlaceholder(name) {
 
 let suppressionTimer = null;
 let scrollRestoreTimers = [];
+let chipNavGeneration = 0;
 
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
 
-  // Save scroll position to restore after navigation
+  // Save scroll position and generation to restore after navigation
   const scrollContainer = document.querySelector("main");
   const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+  chipNavGeneration++;
+  const myNavGeneration = chipNavGeneration;
 
   // Clear any stale Create action state
   pendingCreateText = "";
@@ -2124,13 +2127,14 @@ async function navigateToChip(name) {
   } catch (err) {
     showChipToast("Error: " + err.message);
   } finally {
-    // Clear any previous scroll-restore timers
-    scrollRestoreTimers.forEach(clearTimeout);
-    scrollRestoreTimers = [];
-    // Restore scroll position (cc.select() or DOM changes may have scrolled the task pane)
-    if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
-    scrollRestoreTimers.push(setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50));
-    scrollRestoreTimers.push(setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150));
+    // Only restore scroll if this is still the latest navigation
+    if (myNavGeneration === chipNavGeneration) {
+      scrollRestoreTimers.forEach(clearTimeout);
+      scrollRestoreTimers = [];
+      if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
+      scrollRestoreTimers.push(setTimeout(() => { if (myNavGeneration === chipNavGeneration && scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50));
+      scrollRestoreTimers.push(setTimeout(() => { if (myNavGeneration === chipNavGeneration && scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150));
+    }
     // Re-enable selection preview after a short delay
     suppressionTimer = setTimeout(() => { suppressSelectionPreview = false; }, 500);
   }
