@@ -947,6 +947,14 @@ footer#create-actions {
 }
 
 /* List row */
+#created-list-section {
+  cursor: default;
+}
+
+.created-list-scroll {
+  cursor: pointer !important;
+}
+
 .created-row {
   display: flex;
   align-items: center;
@@ -956,9 +964,10 @@ footer#create-actions {
   transition: background 0.1s;
   border-bottom: 1px solid #f3f4f6;
   user-select: none;
+  -webkit-user-select: none;
 }
 .created-row * {
-  cursor: pointer !important;
+  cursor: inherit !important;
 }
 .created-row:last-child {
   border-bottom: none;
