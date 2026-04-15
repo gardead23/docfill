@@ -197,6 +197,60 @@ function migrateOldCC(cc) {
 }
 
 /**
+ * Sort CC map keys by document order using Range.compareLocationWith.
+ * Uses the first CC of each key for position comparison.
+ * Batches all comparisons into one sync for performance.
+ * Must be called inside Word.run.
+ */
+async function sortKeysByDocumentOrder(context, ccMap) {
+  const keys = Object.keys(ccMap);
+  if (keys.length <= 1) return keys;
+
+  // Get the range of the first CC for each key
+  const ranges = {};
+  for (const key of keys) {
+    if (ccMap[key].items.length > 0) {
+      ranges[key] = ccMap[key].items[0].getRange();
+    }
+  }
+
+  // Batch all pairwise comparisons
+  const comparisons = [];
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      if (ranges[keys[i]] && ranges[keys[j]]) {
+        comparisons.push({
+          a: keys[i],
+          b: keys[j],
+          result: ranges[keys[i]].compareLocationWith(ranges[keys[j]])
+        });
+      }
+    }
+  }
+
+  if (comparisons.length === 0) return keys;
+  await context.sync();
+
+  // Build ordering: for each pair, record which comes first
+  const before = {}; // before[a] = Set of keys that a comes before
+  for (const key of keys) before[key] = new Set();
+
+  for (const { a, b, result } of comparisons) {
+    const v = result.value;
+    if (v === "Before" || v === "AdjacentBefore" ||
+        v === Word.LocationRelation.before || v === Word.LocationRelation.adjacentBefore) {
+      before[a].add(b);
+    } else if (v === "After" || v === "AdjacentAfter" ||
+               v === Word.LocationRelation.after || v === Word.LocationRelation.adjacentAfter) {
+      before[b].add(a);
+    }
+  }
+
+  // Sort by number of keys each comes before (more = earlier in doc)
+  return [...keys].sort((a, b) => before[b].size - before[a].size);
+}
+
+/**
  * Convert a raw {{key}} text range into a DocFill content control.
  * The CC wraps the range, with placeholder text shown inside.
  */
@@ -311,17 +365,8 @@ async function scanDocument() {
       }
 
       // ── Phase C: Build field list and hydrate state ──
-      // Sort keys by document order using body text position of first occurrence
-      const bodyTextForOrder = mainBody.text || "";
-      const allKeys = Object.keys(ccMap).sort((a, b) => {
-        // Find position of {{key}} or the CC's text in body
-        const posA = bodyTextForOrder.toLowerCase().indexOf(`{{${a}}}`);
-        const posB = bodyTextForOrder.toLowerCase().indexOf(`{{${b}}}`);
-        // Keys not in body text (e.g., header-only) go to the end
-        const idxA = posA >= 0 ? posA : bodyTextForOrder.toLowerCase().indexOf(a);
-        const idxB = posB >= 0 ? posB : bodyTextForOrder.toLowerCase().indexOf(b);
-        return (idxA >= 0 ? idxA : Infinity) - (idxB >= 0 ? idxB : Infinity);
-      });
+      // Sort keys by CC document order using Range.compareLocationWith
+      const allKeys = await sortKeysByDocumentOrder(context, ccMap);
 
       if (allKeys.length === 0 && keysInBody.length === 0) {
         currentFields = [];
@@ -493,7 +538,7 @@ async function scanHeaderFooters() {
           ccMap[key].items.push(cc);
         }
 
-        const allKeys = Object.keys(ccMap);
+        const allKeys = await sortKeysByDocumentOrder(context, ccMap);
         // Hydrate filled values
         for (const [key, data] of Object.entries(ccMap)) {
           const text = data.text.trim();
@@ -1414,7 +1459,7 @@ async function checkForNewPlaceholders() {
         ccMap[key].items.push(cc);
       }
 
-      const allKeys = Object.keys(ccMap);
+      const allKeys = await sortKeysByDocumentOrder(context, ccMap);
       if (allKeys.length === 0) {
         // No DocFill fields remain -- clear state and show empty state
         currentFields = [];
