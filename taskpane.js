@@ -2127,9 +2127,21 @@ async function navigateToChip(name) {
   lastSelectedText = "";
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
-  // Clear status content but keep element visible to prevent layout shift
+  // Preserve layout while removing stale actionable content
   const statusEl = document.getElementById("create-status");
-  if (statusEl) statusEl.innerHTML = "";
+  if (statusEl && statusEl.style.display !== "none" && statusEl.innerHTML) {
+    const h = statusEl.offsetHeight;
+    statusEl.innerHTML = "";
+    statusEl.className = "";
+    statusEl.style.height = h + "px";
+    statusEl.style.visibility = "hidden";
+    // Release reserved space after scroll lock ends
+    setTimeout(() => {
+      statusEl.style.height = "";
+      statusEl.style.visibility = "";
+      statusEl.style.display = "none";
+    }, 1600);
+  }
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
@@ -2210,13 +2222,6 @@ function switchToFill() {
 
 // ── Create Status ──────────────────────────────────────────────────────────────
 
-/** Clear and hide #create-status immediately. */
-function clearCreateStatus() {
-  const el = document.getElementById("create-status");
-  if (!el || el.style.display === "none") return;
-  el.innerHTML = "";
-  el.style.display = "none";
-}
 
 /** Prepare #create-status for new content. */
 function prepareCreateStatus() {
