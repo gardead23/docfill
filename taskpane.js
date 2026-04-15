@@ -2121,12 +2121,11 @@ async function navigateToChip(name) {
   const scrollSnapshot = captureTaskPaneScroll();
   startTaskPaneScrollLock(scrollSnapshot, myGeneration);
 
-  // Clear stale Create action state
+  // Clear stale Create action state (don't call hideCreateStatus to avoid layout shift)
   pendingCreateText = "";
   pendingCreateName = "";
   lastSelectedText = "";
   lastSuggestedName = "";
-  hideCreateStatus();
   clearTimeout(selectionDebounceTimer);
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }

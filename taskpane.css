@@ -952,9 +952,13 @@ footer#create-actions {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  cursor: pointer;
+  cursor: pointer !important;
   transition: background 0.1s;
   border-bottom: 1px solid #f3f4f6;
+  user-select: none;
+}
+.created-row * {
+  cursor: pointer !important;
 }
 .created-row:last-child {
   border-bottom: none;
