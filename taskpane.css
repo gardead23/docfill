@@ -52,6 +52,7 @@ header {
 main {
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 16px 14px;
 }
 

@@ -2071,9 +2071,11 @@ let chipNavGeneration = 0;
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
 
-  // Save scroll position and generation to restore after navigation
+  // Save scroll positions for both scrollable containers
   const scrollContainer = document.querySelector("main");
+  const listContainer = document.querySelector(".created-list-scroll");
   const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+  const savedListScrollTop = listContainer ? listContainer.scrollTop : 0;
   chipNavGeneration++;
   const myNavGeneration = chipNavGeneration;
 
@@ -2131,9 +2133,15 @@ async function navigateToChip(name) {
     if (myNavGeneration === chipNavGeneration) {
       scrollRestoreTimers.forEach(clearTimeout);
       scrollRestoreTimers = [];
-      if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
-      scrollRestoreTimers.push(setTimeout(() => { if (myNavGeneration === chipNavGeneration && scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50));
-      scrollRestoreTimers.push(setTimeout(() => { if (myNavGeneration === chipNavGeneration && scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150));
+      const restoreScroll = () => {
+        if (myNavGeneration !== chipNavGeneration) return;
+        if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
+        if (listContainer) listContainer.scrollTop = savedListScrollTop;
+      };
+      restoreScroll();
+      scrollRestoreTimers.push(setTimeout(restoreScroll, 50));
+      scrollRestoreTimers.push(setTimeout(restoreScroll, 150));
+      scrollRestoreTimers.push(setTimeout(restoreScroll, 300));
       suppressionTimer = setTimeout(() => { if (myNavGeneration === chipNavGeneration) suppressSelectionPreview = false; }, 500);
     }
   }
