@@ -1755,7 +1755,7 @@ async function createPlaceholder() {
 }
 
 function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
-  const el = document.getElementById("create-status");
+  const el = prepareCreateStatus();
   const variantCount = allCount - exactCount;
   const btnStyle = 'flex:1;padding:6px 0;background:#2563eb;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;min-width:80px';
   const cancelStyle = 'padding:6px 10px;background:none;border:1.5px solid #bfdbfe;border-radius:6px;font-family:inherit;font-size:12px;color:#1d4ed8;cursor:pointer';
@@ -2010,7 +2010,7 @@ function filterCreatedList(query) {
 
 /** Delete a placeholder: remove all its CCs from the document and refresh the list. */
 function confirmDeletePlaceholder(name) {
-  const el = document.getElementById("create-status");
+  const el = prepareCreateStatus();
   el.innerHTML = `
     <div style="margin-bottom:6px;font-weight:600">Remove {{${escapeHtml(name)}}} from template?</div>
     <div style="margin-bottom:10px;font-size:12px;color:#64748b">This keeps the visible text but removes all DocFill controls for this field across the document.</div>
@@ -2225,10 +2225,16 @@ function clearCreateStatusDeferred() {
   }, 1500);
 }
 
-function showCreateStatus(msg, type) {
+/** Prepare #create-status for new content: cancel deferred clear, reset minHeight. */
+function prepareCreateStatus() {
   clearTimeout(createStatusClearTimer);
   const el = document.getElementById("create-status");
-  el.style.minHeight = "";
+  if (el) el.style.minHeight = "";
+  return el;
+}
+
+function showCreateStatus(msg, type) {
+  const el = prepareCreateStatus();
   el.textContent = msg;
   el.className = type;
   el.style.display = "block";
@@ -2253,6 +2259,7 @@ function cancelCreateAction() {
 }
 
 function hideCreateStatus() {
+  clearTimeout(createStatusClearTimer);
   const el = document.getElementById("create-status");
-  if (el) el.style.display = "none";
+  if (el) { el.style.display = "none"; el.style.minHeight = ""; }
 }
