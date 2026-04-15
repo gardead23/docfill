@@ -667,6 +667,17 @@ footer#create-actions {
 }
 
 /* Disabled input */
+/* Explicit text cursor for all text-entry controls (Office WebView override) */
+.field-value-input,
+.field-value-textarea,
+.field-label-input,
+.fill-search,
+.created-list-search,
+input[type="text"],
+textarea {
+  cursor: text;
+}
+
 .field-value-input:disabled {
   background: #f3f4f6;
   color: #9ca3af;
