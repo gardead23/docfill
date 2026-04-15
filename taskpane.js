@@ -2128,13 +2128,7 @@ async function navigateToChip(name) {
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
   // Clear status content without layout shift: preserve height during scroll lock, then hide
-  const statusEl = document.getElementById("create-status");
-  if (statusEl && statusEl.style.display !== "none") {
-    const h = statusEl.offsetHeight;
-    statusEl.innerHTML = "";
-    statusEl.style.minHeight = h + "px";
-    setTimeout(() => { statusEl.style.display = "none"; statusEl.style.minHeight = ""; }, 1500);
-  }
+  clearCreateStatusDeferred();
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
@@ -2215,8 +2209,26 @@ function switchToFill() {
 
 // ── Create Status ──────────────────────────────────────────────────────────────
 
-function showCreateStatus(msg, type) {
+let createStatusClearTimer = null;
+
+/** Clear status content without layout shift, then hide after delay. */
+function clearCreateStatusDeferred() {
+  clearTimeout(createStatusClearTimer);
   const el = document.getElementById("create-status");
+  if (!el || el.style.display === "none") return;
+  const h = el.offsetHeight;
+  el.innerHTML = "";
+  el.style.minHeight = h + "px";
+  createStatusClearTimer = setTimeout(() => {
+    if (el.innerHTML === "") { el.style.display = "none"; }
+    el.style.minHeight = "";
+  }, 1500);
+}
+
+function showCreateStatus(msg, type) {
+  clearTimeout(createStatusClearTimer);
+  const el = document.getElementById("create-status");
+  el.style.minHeight = "";
   el.textContent = msg;
   el.className = type;
   el.style.display = "block";
