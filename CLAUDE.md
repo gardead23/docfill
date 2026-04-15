@@ -35,7 +35,7 @@ Two-tab layout. Default tab: **Fill** (preserves existing behaviour). **Create**
 |  Selection preview (live)           |
 |  Placeholder name input             |
 |  Convert to Placeholder btn         |
-|  Created so far: scrollable list    |
+|  Placeholders: scrollable list      |
 |    with search, count badges, x     |
 |  Done -- Fill This Template footer  |
 +-------------------------------------+
@@ -167,7 +167,7 @@ Three states:
 - If CCs for the chosen name already exist: "Link to existing" (adds to the same field) or "Use different name" (clears input, lets user rename)
 - `promptRenamePlaceholder()` clears the name input, keeps the pending text, re-enables the Convert button
 
-**Created So Far list:**
+**Placeholders list:**
 - Scrollable, searchable list with count badges and x delete buttons
 - `loadExistingPlaceholders()` counts both DocFill CCs (by tag) and raw `{{key}}` text (for not-yet-converted patterns)
 - Search filters the list in real time via `filterCreatedList()`
@@ -178,7 +178,7 @@ Three states:
 
 ### Chip navigation and scroll-lock
 
-Clicking a row in the "Created so far" list calls `navigateToChip(name)`, which selects the corresponding CC in the document and cycles through occurrences. This involves several coordinated mechanisms to prevent the task pane UI from jumping:
+Clicking a row in the "Placeholders" list calls `navigateToChip(name)`, which selects the corresponding CC in the document and cycles through occurrences. This involves several coordinated mechanisms to prevent the task pane UI from jumping:
 
 **Scroll-lock:** `cc.select()` can cause the task pane to scroll (Office WebView side-effect). To prevent this:
 1. `captureTaskPaneScroll()` snapshots scroll positions of `window`, `document.scrollingElement`, `document.body`, `main`, and the created-list scroll container
@@ -312,7 +312,7 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 - **Input fields:** Explicit `cursor: text` set on `.field-value-input` and `.field-value-textarea` for Office WebView compatibility (WebView does not always default to text cursor on input elements)
 - **Scan banners:** Include an indeterminate progress bar at the bottom edge (`.scan-banner-progress` with a sliding `.scan-banner-progress-bar` animation)
 - **Empty field validation:** `.field-empty` class adds orange left border to the field row and orange border to inputs/textareas/date-selects
-- **Created so far list:** Monospace font for placeholder names, scrollable container, count badges, x delete buttons
+- **Placeholders list:** Monospace font for placeholder names, scrollable container, count badges, x delete buttons
 - **Chip toast:** Fixed-position floating snackbar at the bottom of the task pane, auto-fades after 2s
 
 ## Known Limitations

@@ -27,7 +27,7 @@ Labels and field types are remembered the next time you open the same template. 
 3. Edit the name if needed and click **Convert to Placeholder**
 4. If the text appears multiple times, choose to replace just this one, all exact matches, or all matches including different capitalizations
 5. If a placeholder with that name already exists, you can link to it or choose a different name
-6. The "Created so far" list shows all your fields with occurrence counts -- click any to jump to it in the document, click again to cycle through occurrences
+6. The "Placeholders" list shows all your fields with occurrence counts -- click any to jump to it in the document, click again to cycle through occurrences
 7. Click **Done -- Fill This Template** to switch to the Fill tab and fill it immediately
 
 ---
@@ -158,7 +158,7 @@ npm run test:watch # watch mode
 - **Create tab:** Select text in your doc, give it a name, and DocFill converts it into a placeholder field -- builds your template without typing brackets manually. The input and button stay disabled until you select something.
 - **Multiple occurrences:** When you convert text that appears more than once, you can convert just this occurrence, all exact matches, or all matches including different capitalizations
 - **Existing field linking:** If a placeholder name already exists, you can link to the existing field or choose a different name
-- **Navigate placeholders:** In Create mode, click any item in "Created so far" to jump to that placeholder in the document; click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're on (e.g., "2 of 3").
+- **Navigate placeholders:** In Create mode, click any item in "Placeholders" to jump to that placeholder in the document; click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're on (e.g., "2 of 3").
 - **Delete a placeholder:** Click the x button next to any created placeholder to convert it back to plain text (confirmation required)
 - **Re-fill:** Change a value and click Fill Document again -- it updates the document without needing to clear first
 - **Partial fill:** If you leave some fields empty and click Fill Document, DocFill fills the ones you completed, highlights the empty fields in orange, and scrolls to the first empty one so you can continue
