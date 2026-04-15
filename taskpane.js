@@ -2065,29 +2065,68 @@ async function deleteCreatedPlaceholder(name) {
 }
 
 let suppressionTimer = null;
-let scrollRestoreTimers = [];
 let chipNavGeneration = 0;
+let scrollLockRaf = null;
+let scrollLockTimers = [];
+
+function captureTaskPaneScroll() {
+  const els = [
+    document.scrollingElement,
+    document.documentElement,
+    document.body,
+    document.querySelector("main"),
+    document.querySelector(".created-list-scroll"),
+  ].filter(Boolean);
+  const unique = [...new Set(els)];
+  return {
+    windowX: window.scrollX,
+    windowY: window.scrollY,
+    elements: unique.map((el) => ({ el, top: el.scrollTop, left: el.scrollLeft })),
+  };
+}
+
+function restoreTaskPaneScroll(snapshot) {
+  window.scrollTo(snapshot.windowX, snapshot.windowY);
+  for (const item of snapshot.elements) {
+    item.el.scrollTop = item.top;
+    item.el.scrollLeft = item.left;
+  }
+}
+
+function startTaskPaneScrollLock(snapshot, generation, durationMs) {
+  if (scrollLockRaf) cancelAnimationFrame(scrollLockRaf);
+  scrollLockTimers.forEach(clearTimeout);
+  scrollLockTimers = [];
+  const until = performance.now() + (durationMs || 1500);
+  const tick = () => {
+    if (generation !== chipNavGeneration) return;
+    restoreTaskPaneScroll(snapshot);
+    if (performance.now() < until) scrollLockRaf = requestAnimationFrame(tick);
+  };
+  tick();
+  for (const delay of [0, 50, 150, 300, 600, 1000, 1500]) {
+    scrollLockTimers.push(setTimeout(() => {
+      if (generation === chipNavGeneration) restoreTaskPaneScroll(snapshot);
+    }, delay));
+  }
+}
 
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
 
-  // Save scroll positions for both scrollable containers
-  const scrollContainer = document.querySelector("main");
-  const listContainer = document.querySelector(".created-list-scroll");
-  const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
-  const savedListScrollTop = listContainer ? listContainer.scrollTop : 0;
   chipNavGeneration++;
-  const myNavGeneration = chipNavGeneration;
+  const myGeneration = chipNavGeneration;
 
-  // Clear any stale Create action state
+  const scrollSnapshot = captureTaskPaneScroll();
+  startTaskPaneScrollLock(scrollSnapshot, myGeneration);
+
+  // Clear stale Create action state
   pendingCreateText = "";
   pendingCreateName = "";
   lastSelectedText = "";
   lastSuggestedName = "";
   hideCreateStatus();
-  // Cancel any pending selection fetch
   clearTimeout(selectionDebounceTimer);
-  // Disable controls to prevent stale actions, but don't touch DOM layout
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
@@ -2096,6 +2135,7 @@ async function navigateToChip(name) {
   suppressSelectionPreview = true;
   clearTimeout(suppressionTimer);
   selectionFetchGeneration++;
+
   try {
     await Word.run(async (context) => {
       const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
@@ -2116,8 +2156,13 @@ async function navigateToChip(name) {
       }
 
       const targetIdx = idx % ccs.items.length;
+
+      // Re-lock scroll right before and after cc.select()
+      startTaskPaneScrollLock(scrollSnapshot, myGeneration);
       ccs.items[targetIdx].select();
       await context.sync();
+      startTaskPaneScrollLock(scrollSnapshot, myGeneration);
+
       chipNavIndex[name] = (targetIdx + 1) % ccs.items.length;
 
       if (ccs.items.length > 1) {
@@ -2129,21 +2174,9 @@ async function navigateToChip(name) {
   } catch (err) {
     showChipToast("Error: " + err.message);
   } finally {
-    // Only restore scroll and release suppression if this is still the latest navigation
-    if (myNavGeneration === chipNavGeneration) {
-      scrollRestoreTimers.forEach(clearTimeout);
-      scrollRestoreTimers = [];
-      const restoreScroll = () => {
-        if (myNavGeneration !== chipNavGeneration) return;
-        if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
-        if (listContainer) listContainer.scrollTop = savedListScrollTop;
-      };
-      restoreScroll();
-      scrollRestoreTimers.push(setTimeout(restoreScroll, 50));
-      scrollRestoreTimers.push(setTimeout(restoreScroll, 150));
-      scrollRestoreTimers.push(setTimeout(restoreScroll, 300));
-      suppressionTimer = setTimeout(() => { if (myNavGeneration === chipNavGeneration) suppressSelectionPreview = false; }, 500);
-    }
+    suppressionTimer = setTimeout(() => {
+      if (myGeneration === chipNavGeneration) suppressSelectionPreview = false;
+    }, 500);
   }
 }
 
