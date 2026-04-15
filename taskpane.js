@@ -2085,7 +2085,7 @@ async function navigateToChip(name) {
       chipNavIndex[name] = (targetIdx + 1) % ccs.items.length;
 
       if (ccs.items.length > 1) {
-        showCreateStatus(`{{${name}}} -- occurrence ${targetIdx + 1} of ${ccs.items.length}`, "info");
+        showCreateStatus(`{{${name}}} \u2022 Match ${targetIdx + 1} of ${ccs.items.length}`, "info");
       } else {
         hideCreateStatus();
       }
