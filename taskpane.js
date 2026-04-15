@@ -2077,16 +2077,11 @@ async function navigateToChip(name) {
   hideCreateStatus();
   // Cancel any pending selection fetch
   clearTimeout(selectionDebounceTimer);
-  // Reset UI to idle without causing scroll (set elements directly)
-  const preview = document.getElementById("selection-preview");
-  if (preview) {
-    preview.className = "selection-preview selection-idle";
-    preview.innerHTML = '<svg class="selection-idle-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 1h4M5 13h4M7 1v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="selection-idle-text">Highlight text in the document to begin</span>';
-  }
+  // Disable controls to prevent stale actions, but don't touch DOM layout
   const nameInput = document.getElementById("placeholder-name-input");
-  if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
+  if (nameInput) nameInput.disabled = true;
   const replaceBtn = document.getElementById("create-replace-btn");
-  if (replaceBtn) { replaceBtn.disabled = true; replaceBtn.classList.add("btn-disabled"); replaceBtn.innerHTML = "Convert to Placeholder"; }
+  if (replaceBtn) { replaceBtn.disabled = true; replaceBtn.classList.add("btn-disabled"); }
 
   suppressSelectionPreview = true;
   clearTimeout(suppressionTimer);
