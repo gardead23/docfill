@@ -2094,6 +2094,7 @@ function restoreTaskPaneScroll(snapshot) {
 }
 
 function startTaskPaneScrollLock(snapshot, generation, durationMs) {
+  if (generation !== chipNavGeneration) return;
   if (scrollLockRaf) cancelAnimationFrame(scrollLockRaf);
   scrollLockTimers.forEach(clearTimeout);
   scrollLockTimers = [];
