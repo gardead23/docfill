@@ -2216,13 +2216,10 @@ function clearCreateStatusDeferred() {
   clearTimeout(createStatusClearTimer);
   const el = document.getElementById("create-status");
   if (!el || el.style.display === "none") return;
-  const h = el.offsetHeight;
+  // Clear content immediately (removes stale buttons)
   el.innerHTML = "";
-  el.style.minHeight = h + "px";
-  createStatusClearTimer = setTimeout(() => {
-    if (el.innerHTML === "") { el.style.display = "none"; }
-    el.style.minHeight = "";
-  }, 1500);
+  // Hide immediately -- the empty element has no height anyway
+  el.style.display = "none";
 }
 
 /** Prepare #create-status for new content: cancel deferred clear, reset minHeight. */
