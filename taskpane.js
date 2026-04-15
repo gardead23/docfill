@@ -2065,6 +2065,7 @@ async function deleteCreatedPlaceholder(name) {
 }
 
 let suppressionTimer = null;
+let scrollRestoreTimers = [];
 
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
@@ -2123,11 +2124,13 @@ async function navigateToChip(name) {
   } catch (err) {
     showChipToast("Error: " + err.message);
   } finally {
+    // Clear any previous scroll-restore timers
+    scrollRestoreTimers.forEach(clearTimeout);
+    scrollRestoreTimers = [];
     // Restore scroll position (cc.select() or DOM changes may have scrolled the task pane)
     if (scrollContainer) scrollContainer.scrollTop = savedScrollTop;
-    // Also restore on a short delay in case async events cause scroll
-    setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50);
-    setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150);
+    scrollRestoreTimers.push(setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 50));
+    scrollRestoreTimers.push(setTimeout(() => { if (scrollContainer) scrollContainer.scrollTop = savedScrollTop; }, 150));
     // Re-enable selection preview after a short delay
     suppressionTimer = setTimeout(() => { suppressSelectionPreview = false; }, 500);
   }
