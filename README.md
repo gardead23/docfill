@@ -22,12 +22,13 @@ Labels and field types are remembered the next time you open the same template. 
 
 ### Creating a template from an existing document
 
-1. Open the DocFill task pane and go to the **Create** tab
-2. Select any text in your document -- the task pane shows a live preview of your selection
-3. Type a placeholder name (auto-suggested from the selected text) and click **Convert to Placeholder**
-4. If the text appears multiple times, choose to replace just this one or all occurrences
-5. The "Created so far" list shows all your fields -- click any to jump to it in the document
-6. Click **Done -- Fill This Template** to switch to the Fill tab and fill it immediately
+1. Open the DocFill task pane and go to the **Create** tab -- you'll see a dashed dropzone prompting you to select text
+2. Select any text in your document -- the task pane shows a live preview of your selection (highlighted in blue) and auto-suggests a placeholder name
+3. Edit the name if needed and click **Convert to Placeholder**
+4. If the text appears multiple times, choose to replace just this one, all exact matches, or all matches including different capitalizations
+5. If a placeholder with that name already exists, you can link to it or choose a different name
+6. The "Created so far" list shows all your fields with occurrence counts -- click any to jump to it in the document, click again to cycle through occurrences
+7. Click **Done -- Fill This Template** to switch to the Fill tab and fill it immediately
 
 ---
 
@@ -154,18 +155,20 @@ npm run test:watch # watch mode
 
 ## Tips
 
-- **Create tab:** Select text in your doc, give it a name, and DocFill converts it into a placeholder field -- builds your template without typing brackets manually
+- **Create tab:** Select text in your doc, give it a name, and DocFill converts it into a placeholder field -- builds your template without typing brackets manually. The input and button stay disabled until you select something.
 - **Multiple occurrences:** When you convert text that appears more than once, you can convert just this occurrence, all exact matches, or all matches including different capitalizations
 - **Existing field linking:** If a placeholder name already exists, you can link to the existing field or choose a different name
-- **Navigate placeholders:** In Create mode, click any item in "Created so far" to jump to that placeholder in the document; click again to cycle through multiple occurrences
-- **Delete a placeholder:** Click the x button next to any created placeholder to convert it back to plain text
+- **Navigate placeholders:** In Create mode, click any item in "Created so far" to jump to that placeholder in the document; click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're on (e.g., "2 of 3").
+- **Delete a placeholder:** Click the x button next to any created placeholder to convert it back to plain text (confirmation required)
 - **Re-fill:** Change a value and click Fill Document again -- it updates the document without needing to clear first
+- **Partial fill:** If you leave some fields empty and click Fill Document, DocFill fills the ones you completed, highlights the empty fields in orange, and scrolls to the first empty one so you can continue
 - **Per-field undo:** Click the undo icon on any filled field to restore just that placeholder
 - **Full reset:** Click **Reset All Fields** to restore all filled values back to their `{{placeholder}}` markers. Other edits you made to the document are preserved
-- **Search and sort:** Use the search bar to filter fields by name, and the sort dropdown to switch between document order and A-Z
-- **Ctrl+Z recovery:** If you undo changes in Word, DocFill picks up the reverted state the next time it scans
+- **Search and sort:** Use the search bar to filter fields by name or label, and the sort dropdown to switch between document order and A-Z. If you click Fill while a search filter is hiding empty fields, DocFill clears the filter first so you can see them.
+- **Ctrl+Z recovery:** If you undo changes in Word, DocFill picks up the reverted state the next time it scans. If the content controls themselves were removed by undo, DocFill auto-rescans on the next Fill attempt.
 - **Labels are saved** per template -- your customizations persist across sessions
 - **Headers and footers supported:** DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported
+- **Multi-line text:** Long text fields support multiple lines. Line breaks are preserved inside the document using soft line breaks (same paragraph formatting is maintained)
 
 ---
 

@@ -81,6 +81,12 @@ Six top-level state variables:
 - `pendingCreateText / pendingCreateName` -- held during the multi-occurrence confirmation flow
 - `chipNavIndex` -- `Record<string, number>` tracks which occurrence to navigate to next per placeholder
 - `selectionDebounceTimer / selectionFetchInProgress` -- guard against overlapping Word.run calls
+- `suppressSelectionPreview` -- boolean flag that prevents selection preview updates during programmatic chip navigation (so `cc.select()` does not trigger the selection UI)
+- `selectionFetchGeneration` -- generation counter incremented on chip navigation; in-flight `fetchCurrentSelection()` calls check this to abort if a newer navigation has started
+- `chipNavGeneration` -- generation counter for scroll-lock; each `navigateToChip()` call increments it so older locks stop immediately
+- `scrollLockRaf / scrollLockTimers` -- handle for `requestAnimationFrame` loop and scheduled `setTimeout` callbacks that enforce scroll position during chip navigation
+- `suppressionTimer` -- delayed re-enable of `suppressSelectionPreview` (500ms after navigation completes)
+- `statusPreserveTimer` -- delayed cleanup of the layout-preserving status clear (releases the fixed-height invisible placeholder after 1600ms)
 
 ### Scan phases
 
@@ -131,9 +137,9 @@ Six top-level state variables:
 - Two syncs total regardless of field count: one to load all CC collections, one to apply all updates
 - `\n` in textarea values is converted to `\v` (vertical tab = soft line break in Word) to preserve inline formatting within the same paragraph
 - Auto-rescan if zero CCs found (covers Ctrl+Z recovery where user undid the scan itself)
-- Auto-scroll to first empty field with auto-focus on Fill click when some fields are still empty
-- If search filter is active and there are hidden empty fields, Fill clears the filter to reveal them
-- Empty fields get `.field-empty` class (orange highlight)
+- Auto-scroll to center + auto-focus first empty field on Fill click when some fields are still empty (`scrollToFirstEmptyField()` uses `block: "center"` and a 400ms delayed `focus()`)
+- If search filter is active and there are hidden empty fields, Fill clears the search input and resets `fillFilterText` before applying validation styling, so all empty fields are visible
+- Empty fields get `.field-empty` class (orange highlight). Empty date dropdowns also receive orange validation styling via CSS.
 
 ### Reset behavior
 
@@ -145,13 +151,15 @@ Six top-level state variables:
 ### Create mode state machine
 
 Three states:
-1. **Idle** -- no text selected. Selection preview shows "Highlight text in the document to begin." Name input and Convert button are disabled.
-2. **Active** -- text selected (single paragraph only, multi-paragraph discarded). Selection preview shows the selected text. Name input enabled with auto-suggested name. Convert button enabled.
+1. **Idle** -- no text selected. Selection preview shows a dashed dropzone instruction box ("Highlight text in the document to begin"). Name input and Convert button are disabled (grayed out). The preview has `selection-idle` class styling.
+2. **Active** -- text selected (single paragraph only, multi-paragraph discarded). Selection preview switches to a blue `has-selection` style showing "SELECTED" label and the quoted text. Name input enabled with auto-suggested name and auto-focus. Convert button enabled.
 3. **Confirmation** -- multiple occurrences, case variants, or existing CCs detected. Inline confirmation dialog with options like "This one only", "All N matches", "Link to existing", "Use different name", "Cancel".
 
 **Selection loss problem:** Clicking task pane buttons loses the document selection. Solved by storing `lastSelectedText` from the debounced `DocumentSelectionChanged` event; the button handler uses the stored value, not the live selection.
 
 **Selection-based targeting:** When `confirmReplace('single')` runs, it uses `Range.compareLocationWith()` (WordApi 1.3) against the current selection to find which occurrence the user intended. If the selection has changed, it shows "Selection changed. Please select the text again."
+
+**Word matching:** `matchWholeWord` is conditionally enabled for simple word/phrase selections (text matching `/^\w+(\s+\w+)*$/`). This prevents partial-word matches when the selected text is a plain word or phrase. Selections containing punctuation or symbols use substring matching.
 
 **Occurrence counting:** Case-insensitive search across all bodies (`searchAllBodies()`) with `dedupeRanges()` to handle linked headers. Parent-CC check skips ranges inside any content control (not just DocFill CCs). Reports exact-case count vs. variant count separately.
 
@@ -166,7 +174,27 @@ Three states:
 - Click a row to navigate to that placeholder in the document (cycles through occurrences via `chipNavIndex`)
 - Count badges auto-sync if the CC count changes (e.g., user manually deleted one)
 
-**Delete (`deleteCreatedPlaceholder()`):** Converts CC back to plain text (strips `{{braces}}`, keeps the word), then removes the CC wrapper (`cc.delete(true)`). Two-phase sync (replace text, then delete wrapper). Removes from `createdPlaceholders`, `currentFields`, and `lastFilledValues`.
+**Delete (`deleteCreatedPlaceholder()`):** Inline confirmation dialog first. Converts CC back to plain text (strips `{{braces}}`, keeps the word), then removes the CC wrapper (`cc.delete(true)`). Two-phase sync (replace text, then delete wrapper). Removes from `createdPlaceholders`, `currentFields`, and `lastFilledValues`.
+
+### Chip navigation and scroll-lock
+
+Clicking a row in the "Created so far" list calls `navigateToChip(name)`, which selects the corresponding CC in the document and cycles through occurrences. This involves several coordinated mechanisms to prevent the task pane UI from jumping:
+
+**Scroll-lock:** `cc.select()` can cause the task pane to scroll (Office WebView side-effect). To prevent this:
+1. `captureTaskPaneScroll()` snapshots scroll positions of `window`, `document.scrollingElement`, `document.body`, `main`, and the created-list scroll container
+2. `startTaskPaneScrollLock(snapshot, generation, durationMs)` runs a `requestAnimationFrame` loop for 1.5s that continuously restores the snapshot, plus scheduled `setTimeout` callbacks at key intervals (0, 50, 150, 300, 600, 1000, 1500ms) as a belt-and-suspenders approach
+3. The scroll-lock re-fires right before and after `cc.select()` + `context.sync()`
+4. Generation tokens (`chipNavGeneration`) ensure only the latest navigation holds the lock
+
+**Selection preview suppression:** `cc.select()` fires `DocumentSelectionChanged`, which would normally update the selection preview and show the CC's placeholder text as a "selection." This is suppressed via:
+1. `suppressSelectionPreview = true` before navigation begins
+2. `selectionFetchGeneration++` to cancel any in-flight `fetchCurrentSelection()` calls
+3. `onSelectionChanged()` and `fetchCurrentSelection()` both early-return when `suppressSelectionPreview` is true
+4. A 500ms `suppressionTimer` re-enables `suppressSelectionPreview` after navigation completes
+
+**Layout-preserving status clear:** When navigating, any existing create-status content (e.g., a confirmation dialog) must be cleared without causing layout shift. `navigateToChip()` sets the status element's `height` to its current `offsetHeight`, sets `visibility: hidden`, and clears `innerHTML`. A 1600ms timer later releases the fixed height. If a newer status message appears before the timer fires, `prepareCreateStatus()` cancels the timer and resets the height/visibility.
+
+**Floating toast:** `showChipToast(msg)` displays a floating snackbar at the bottom of the task pane (CSS class `chip-toast`, positioned with `position: fixed`). Shows the placeholder name and occurrence index (e.g., "{{name}} (2 of 3)"). Auto-dismisses with opacity fade after 2s. Does not affect layout.
 
 ### Header/footer support
 
@@ -211,11 +239,12 @@ Legacy migration: old `type: "number"` values are silently converted to `"text"`
 
 ### Search and sort on Fill tab
 
-- **Search bar** above the field list filters fields by key or label (case-insensitive substring match)
-- **Sort dropdown** with two options: Document order (default) and A-Z (by label)
-- `applyFieldDisplayOrder()` reorders existing DOM nodes without rebuilding them (preserves typed draft values)
-- Shows "No fields match your search" when filter returns zero results
+- **Search bar** (`#fill-search`) above the field list filters fields by key or label (case-insensitive substring match via `filterFillFields()`)
+- **Sort dropdown** with two options: Document order (default, `fillSortMode = "doc"`) and A-Z by label (`fillSortMode = "az"`). Dropdown menu opened/closed by `toggleSortMenu()` with outside-click dismissal.
+- `applyFieldDisplayOrder()` reorders existing DOM nodes without rebuilding them (preserves typed draft values). For each key in the ordered list, it sets `row.style.display` based on filter match, then appends the row to the list (DOM reorder without destroy/recreate).
+- Shows "No fields match your search" when filter returns zero results (dynamically created `.fill-no-results` div)
 - Fill clears search filter if there are hidden empty fields (so validation highlighting is visible)
+- State variables: `fillSortMode` (`"doc"` | `"az"`) and `fillFilterText` (lowercase query string)
 
 ### localStorage persistence
 
@@ -266,11 +295,25 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 ## Performance
 
 - **Body scan batched:** All raw `{{key}}` searches issued in parallel (one `body.search()` per key), loaded in one sync. Parent-CC checks also batched into one sync.
-- **HF scan deferred and non-blocking:** Form renders immediately from body CCs. HF scan runs in the background; user can start filling while it completes.
-- **Incremental check on tab switch:** `checkForNewPlaceholders()` uses body text + CC comparison -- no HF loading. Only re-renders if changes detected.
+- **HF scan deferred and non-blocking:** Form renders immediately from body CCs. HF scan runs in the background; user can start filling while it completes. Scan status banner shows an indeterminate progress bar at its bottom edge.
+- **Incremental check on tab switch:** `checkForNewPlaceholders()` is body-only (no HF loading). Loads body text + all CCs in one sync. Compares current CC keys against `currentFields` to detect additions/deletions. Only re-renders if changes detected.
 - **Fill is CC-only:** Two syncs total (load collections + apply updates) regardless of field count. No text search involved.
-- **DOM reorder preserves drafts:** Sort and filter move DOM nodes without destroying/rebuilding them.
+- **DOM reorder preserves drafts:** `applyFieldDisplayOrder()` moves existing DOM nodes via `fieldsList.appendChild(row)` without destroying/rebuilding them. Sort and filter both use this function.
+- **Document order via pairwise scoring:** `sortKeysByDocumentOrder()` uses `Range.compareLocationWith()` (WordApi 1.3) with a pairwise scoring approach. For multi-occurrence keys, it first finds the earliest CC per key using within-key pairwise comparisons (one sync), then compares representative CCs across keys (one sync). Each comparison increments a score for the "before" element; keys are sorted by descending score.
 - **Full Scan Document runs deferred HF scan every time; tab-switch incremental checks are body-only.**
+
+## Visual / CSS Notes
+
+- **Tab bar:** iOS-style segmented controls for Create/Fill tabs and for field type pills (Text, Date, Long text)
+- **Create tab idle state:** Dashed dropzone instruction box with icon and muted text
+- **System font stack:** `"Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif` -- no external font dependencies (Google Fonts removed for security hardening)
+- **Reset All Fields button:** Muted red text with hover underline (`.btn-clear` class)
+- **Undo button:** Darker icon color (`#9ca3af`) and thicker SVG stroke (`stroke-width="2"`) for visibility
+- **Input fields:** Explicit `cursor: text` set on `.field-value-input` and `.field-value-textarea` for Office WebView compatibility (WebView does not always default to text cursor on input elements)
+- **Scan banners:** Include an indeterminate progress bar at the bottom edge (`.scan-banner-progress` with a sliding `.scan-banner-progress-bar` animation)
+- **Empty field validation:** `.field-empty` class adds orange left border to the field row and orange border to inputs/textareas/date-selects
+- **Created so far list:** Monospace font for placeholder names, scrollable container, count badges, x delete buttons
+- **Chip toast:** Fixed-position floating snackbar at the bottom of the task pane, auto-fades after 2s
 
 ## Known Limitations
 
