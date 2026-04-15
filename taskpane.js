@@ -84,6 +84,8 @@ let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
 /** Suppresses selection preview updates during programmatic navigation. */
 let suppressSelectionPreview = false;
+/** Generation token for selection fetch -- incremented on chip navigation to cancel in-flight fetches. */
+let selectionFetchGeneration = 0;
 /** True while background HF scan is running */
 let hfScanInProgress = false;
 
@@ -1603,11 +1605,14 @@ function onSelectionChanged() {
 async function fetchCurrentSelection() {
   if (activeTab !== "create" || selectionFetchInProgress || suppressSelectionPreview) return;
   selectionFetchInProgress = true;
+  const myGeneration = selectionFetchGeneration;
   try {
     await Word.run(async (context) => {
       const sel = context.document.getSelection();
       sel.load("text");
       await context.sync();
+      // Abort if navigation happened during this async fetch
+      if (myGeneration !== selectionFetchGeneration || suppressSelectionPreview) return;
       const text = sel.text.trim();
       lastSelectedText = text.includes("\r") || text.includes("\n") ? "" : text;
       updateSelectionPreview(lastSelectedText);
@@ -2085,6 +2090,7 @@ async function navigateToChip(name) {
 
   suppressSelectionPreview = true;
   clearTimeout(suppressionTimer);
+  selectionFetchGeneration++;
   try {
     await Word.run(async (context) => {
       const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
