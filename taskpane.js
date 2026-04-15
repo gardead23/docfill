@@ -1597,7 +1597,7 @@ async function initCreateTab() {
 // ── Selection Monitoring ───────────────────────────────────────────────────────
 
 function onSelectionChanged() {
-  if (activeTab !== "create") return;
+  if (activeTab !== "create" || suppressSelectionPreview) return;
   clearTimeout(selectionDebounceTimer);
   selectionDebounceTimer = setTimeout(fetchCurrentSelection, 250);
 }
