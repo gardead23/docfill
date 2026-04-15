@@ -715,6 +715,28 @@ footer#create-actions {
   text-decoration: underline;
 }
 
+/* ── Chip Navigation Toast ── */
+.chip-toast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: #1f2937;
+  color: #ffffff;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
 /* ── Spinner ── */
 .spinner {
   display: inline-block;

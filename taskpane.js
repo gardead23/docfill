@@ -82,6 +82,8 @@ let pendingCreateName = "";
 const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
+/** Suppresses selection preview updates during programmatic navigation. */
+let suppressSelectionPreview = false;
 /** True while background HF scan is running */
 let hfScanInProgress = false;
 
@@ -1599,7 +1601,7 @@ function onSelectionChanged() {
 }
 
 async function fetchCurrentSelection() {
-  if (activeTab !== "create" || selectionFetchInProgress) return;
+  if (activeTab !== "create" || selectionFetchInProgress || suppressSelectionPreview) return;
   selectionFetchInProgress = true;
   try {
     await Word.run(async (context) => {
@@ -2059,9 +2061,9 @@ async function deleteCreatedPlaceholder(name) {
 
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
+  suppressSelectionPreview = true;
   try {
     await Word.run(async (context) => {
-      // Navigate via DocFill CCs instead of text search
       const ccs = context.document.contentControls.getByTag(keyToCCTag(name));
       ccs.load("items");
       await context.sync();
@@ -2069,14 +2071,14 @@ async function navigateToChip(name) {
       if (ccs.items.length === 0) {
         createdPlaceholders = createdPlaceholders.filter((e) => e.name !== name);
         renderCreatedList(document.getElementById("created-list-search")?.value);
-        showCreateStatus(`Placeholder not found. {{${name}}} has been removed.`, "info");
+        showChipToast(`Placeholder not found. {{${name}}} removed.`);
         return;
       }
 
       const entry = createdPlaceholders.find((e) => e.name === name);
       if (entry && entry.count !== ccs.items.length) {
         entry.count = ccs.items.length;
-        renderCreatedList();
+        renderCreatedList(document.getElementById("created-list-search")?.value);
       }
 
       const targetIdx = idx % ccs.items.length;
@@ -2085,14 +2087,38 @@ async function navigateToChip(name) {
       chipNavIndex[name] = (targetIdx + 1) % ccs.items.length;
 
       if (ccs.items.length > 1) {
-        showCreateStatus(`{{${name}}} \u2022 Match ${targetIdx + 1} of ${ccs.items.length}`, "info");
+        showChipToast(`{{${name}}} (${targetIdx + 1} of ${ccs.items.length})`);
       } else {
-        hideCreateStatus();
+        showChipToast(`{{${name}}}`);
       }
     });
   } catch (err) {
-    showCreateStatus("Error: " + err.message, "error");
+    showChipToast("Error: " + err.message);
+  } finally {
+    // Re-enable selection preview after a short delay
+    // (Word's selection change event fires after cc.select())
+    setTimeout(() => { suppressSelectionPreview = false; }, 500);
   }
+}
+
+/** Show a floating toast that doesn't shift layout. Auto-dismisses after 2s. */
+let chipToastTimer = null;
+function showChipToast(msg) {
+  let toast = document.getElementById("chip-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "chip-toast";
+    toast.className = "chip-toast";
+    document.getElementById("app").appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.display = "block";
+  toast.style.opacity = "1";
+  clearTimeout(chipToastTimer);
+  chipToastTimer = setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => { toast.style.display = "none"; }, 300);
+  }, 2000);
 }
 
 function switchToFill() {
