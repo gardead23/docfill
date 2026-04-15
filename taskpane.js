@@ -311,8 +311,17 @@ async function scanDocument() {
       }
 
       // ── Phase C: Build field list and hydrate state ──
-      // Render form immediately from body + existing CCs (fast path)
-      const allKeys = Object.keys(ccMap);
+      // Sort keys by document order using body text position of first occurrence
+      const bodyTextForOrder = mainBody.text || "";
+      const allKeys = Object.keys(ccMap).sort((a, b) => {
+        // Find position of {{key}} or the CC's text in body
+        const posA = bodyTextForOrder.toLowerCase().indexOf(`{{${a}}}`);
+        const posB = bodyTextForOrder.toLowerCase().indexOf(`{{${b}}}`);
+        // Keys not in body text (e.g., header-only) go to the end
+        const idxA = posA >= 0 ? posA : bodyTextForOrder.toLowerCase().indexOf(a);
+        const idxB = posB >= 0 ? posB : bodyTextForOrder.toLowerCase().indexOf(b);
+        return (idxA >= 0 ? idxA : Infinity) - (idxB >= 0 ? idxB : Infinity);
+      });
 
       if (allKeys.length === 0 && keysInBody.length === 0) {
         currentFields = [];
