@@ -715,10 +715,10 @@ footer#create-actions {
   text-decoration: underline;
 }
 
-/* ── Chip Navigation Toast ── */
+/* ── Chip Navigation Toast (Snackbar) ── */
 .chip-toast {
   position: fixed;
-  top: 12px;
+  bottom: 72px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;

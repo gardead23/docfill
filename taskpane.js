@@ -2064,13 +2064,12 @@ let suppressionTimer = null;
 async function navigateToChip(name) {
   const idx = chipNavIndex[name] || 0;
 
-  // Clear any stale Create selection/action state
+  // Clear any stale Create action state (but don't update preview DOM to avoid scroll)
   pendingCreateText = "";
   pendingCreateName = "";
   lastSelectedText = "";
   lastSuggestedName = "";
   hideCreateStatus();
-  updateSelectionPreview("");
 
   suppressSelectionPreview = true;
   clearTimeout(suppressionTimer);
