@@ -2121,12 +2121,20 @@ async function navigateToChip(name) {
   const scrollSnapshot = captureTaskPaneScroll();
   startTaskPaneScrollLock(scrollSnapshot, myGeneration);
 
-  // Clear stale Create action state (don't call hideCreateStatus to avoid layout shift)
+  // Clear stale Create action state
   pendingCreateText = "";
   pendingCreateName = "";
   lastSelectedText = "";
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
+  // Clear status content without layout shift: preserve height during scroll lock, then hide
+  const statusEl = document.getElementById("create-status");
+  if (statusEl && statusEl.style.display !== "none") {
+    const h = statusEl.offsetHeight;
+    statusEl.innerHTML = "";
+    statusEl.style.minHeight = h + "px";
+    setTimeout(() => { statusEl.style.display = "none"; statusEl.style.minHeight = ""; }, 1500);
+  }
   const nameInput = document.getElementById("placeholder-name-input");
   if (nameInput) { nameInput.disabled = true; nameInput.value = ""; }
   const replaceBtn = document.getElementById("create-replace-btn");
