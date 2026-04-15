@@ -197,57 +197,84 @@ function migrateOldCC(cc) {
 }
 
 /**
- * Sort CC map keys by document order using Range.compareLocationWith.
- * Uses the first CC of each key for position comparison.
- * Batches all comparisons into one sync for performance.
+ * Sort CC map keys by document order.
+ * Flattens all CCs into {key, cc} pairs, sorts them by range position,
+ * then returns keys in order of their earliest occurrence.
+ * Uses two syncs: one for within-key earliest detection, one for cross-key ordering.
  * Must be called inside Word.run.
  */
 async function sortKeysByDocumentOrder(context, ccMap) {
   const keys = Object.keys(ccMap);
   if (keys.length <= 1) return keys;
 
-  // Get the range of the first CC for each key
-  const ranges = {};
+  // For each key, pick one representative CC.
+  // For single-CC keys, use that CC. For multi-CC keys, find the earliest.
+  const representative = {};
+  const multiKeys = [];
+
   for (const key of keys) {
-    if (ccMap[key].items.length > 0) {
-      ranges[key] = ccMap[key].items[0].getRange();
+    const items = ccMap[key].items;
+    if (items.length === 1) {
+      representative[key] = items[0];
+    } else {
+      representative[key] = items[0]; // default, may be updated
+      multiKeys.push(key);
     }
   }
 
-  // Batch all pairwise comparisons
-  const comparisons = [];
-  for (let i = 0; i < keys.length; i++) {
-    for (let j = i + 1; j < keys.length; j++) {
-      if (ranges[keys[i]] && ranges[keys[j]]) {
-        comparisons.push({
-          a: keys[i],
-          b: keys[j],
-          result: ranges[keys[i]].compareLocationWith(ranges[keys[j]])
+  // Find earliest CC per multi-occurrence key (one sync)
+  if (multiKeys.length > 0) {
+    const withinComps = [];
+    for (const key of multiKeys) {
+      const items = ccMap[key].items;
+      for (let i = 1; i < items.length; i++) {
+        withinComps.push({
+          key, i,
+          result: representative[key].getRange().compareLocationWith(items[i].getRange())
         });
+      }
+    }
+    await context.sync();
+
+    for (const { key, i, result } of withinComps) {
+      const v = result.value;
+      if (v === "After" || v === "AdjacentAfter" ||
+          v === Word.LocationRelation.after || v === Word.LocationRelation.adjacentAfter) {
+        representative[key] = ccMap[key].items[i];
       }
     }
   }
 
-  if (comparisons.length === 0) return keys;
-  await context.sync();
-
-  // Build ordering: for each pair, record which comes first
-  const before = {}; // before[a] = Set of keys that a comes before
-  for (const key of keys) before[key] = new Set();
-
-  for (const { a, b, result } of comparisons) {
-    const v = result.value;
-    if (v === "Before" || v === "AdjacentBefore" ||
-        v === Word.LocationRelation.before || v === Word.LocationRelation.adjacentBefore) {
-      before[a].add(b);
-    } else if (v === "After" || v === "AdjacentAfter" ||
-               v === Word.LocationRelation.after || v === Word.LocationRelation.adjacentAfter) {
-      before[b].add(a);
+  // Compare representative CCs across keys (one sync)
+  const crossComps = [];
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      crossComps.push({
+        a: keys[i], b: keys[j],
+        result: representative[keys[i]].getRange().compareLocationWith(representative[keys[j]].getRange())
+      });
     }
   }
 
-  // Sort by number of keys each comes before (more = earlier in doc)
-  return [...keys].sort((a, b) => before[b].size - before[a].size);
+  if (crossComps.length === 0) return keys;
+  await context.sync();
+
+  const score = {};
+  for (const key of keys) score[key] = 0;
+
+  for (const { a, b, result } of crossComps) {
+    const v = result.value;
+    if (v === "Before" || v === "AdjacentBefore" ||
+        v === Word.LocationRelation.before || v === Word.LocationRelation.adjacentBefore) {
+      score[a]++;
+    } else if (v === "After" || v === "AdjacentAfter" ||
+               v === Word.LocationRelation.after || v === Word.LocationRelation.adjacentAfter) {
+      score[b]++;
+    }
+  }
+
+  // Higher score = comes before more keys = earlier in document
+  return [...keys].sort((a, b) => score[b] - score[a]);
 }
 
 /**
