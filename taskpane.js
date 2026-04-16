@@ -1768,59 +1768,66 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
     ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. Converting will link to the same field.</div>`
     : "";
 
-  if (exactCount === 0) {
-    // Only variant matches (no exact-case matches at all)
-    description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = allCount === 1
-      ? `<button onclick="confirmReplace('all')" style="${btnStyle}">Convert</button>
-         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
-      : `<button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
-         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
-  } else if (allCount === 1 && exactCount === 1) {
-    // Single exact match (only showing because existing CCs exist)
-    description = `Found <strong>1 match</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = existingCount > 0
-      ? `<button onclick="confirmReplace('single')" style="${btnStyle}">Link to existing</button>
-         <button onclick="promptRenamePlaceholder()" style="${renameStyle}">Use different name</button>
-         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
-      : `<button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
-         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
-  } else if (variantCount === 0) {
-    // Multiple exact matches only
-    description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    const singleLabel = "This one only";
-    buttons = `
-      <button onclick="confirmReplace('single')" style="${btnStyle}">${singleLabel}</button>
-      <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
-      <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
-  } else if (exactCount === 1 && variantCount > 0) {
-    // 1 exact + variants
-    description = `Found <strong>1 exact match</strong> and <strong>${variantCount} match${variantCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = allCount === 2
-      ? `<button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-         <button onclick="confirmReplace('all')" style="${btnStyle}">Both matches</button>
-         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
-      : `<button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-         <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
-         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+  // When existing CCs exist, use "Link" language. Otherwise use "Convert/Replace" language.
+  if (existingCount > 0) {
+    // ── Existing field: "Link" wording ──
+    description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong>. Link ${allCount > 1 ? "them" : "it"} to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
+
+    if (allCount === 1) {
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else if (variantCount === 0) {
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
+        <button onclick="confirmReplace('exact')" style="${btnStyle}">Link all ${allCount}</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else if (exactCount === 0) {
+      buttons = allCount === 1
+        ? `<button onclick="confirmReplace('all')" style="${btnStyle}">Link this one</button>
+           <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
+        : `<button onclick="confirmReplace('all')" style="${btnStyle}">Link all ${allCount}</button>
+           <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else {
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
+        <button onclick="confirmReplace('exact')" style="${btnStyle}">Link ${exactCount} exact</button>
+        <button onclick="confirmReplace('all')" style="${btnStyle}">Link all ${allCount}</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    }
+
+    const renameRow = `<div style="margin-top:6px"><button onclick="promptRenamePlaceholder()" style="${renameStyle};width:100%">Use different name</button></div>`;
+
+    el.innerHTML = `
+      <div style="margin-bottom:8px">${description}${existingNote}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>${renameRow}`;
+
   } else {
-    // Multiple exact + variants
-    description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong> and <strong>${variantCount} match${variantCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-    buttons = `
-      <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-      <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} same-capitalization</button>
-      <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
-      <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    // ── No existing field: "Convert/Replace" wording ──
+    if (exactCount === 0) {
+      description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+      buttons = `
+        <button onclick="confirmReplace('all')" style="${btnStyle}">${allCount === 1 ? "Convert" : `All ${allCount} matches`}</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else if (variantCount === 0) {
+      description = `Found <strong>${exactCount} match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+        <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else {
+      description = `Found <strong>${exactCount} exact</strong> and <strong>${variantCount}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+        ${exactCount > 1 ? `<button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} exact</button>` : ""}
+        <button onclick="confirmReplace('all')" style="${btnStyle}">All ${allCount} matches</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    }
+
+    el.innerHTML = `
+      <div style="margin-bottom:8px">${description}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
   }
-
-  // For multi-match with existing CCs, add rename option as a secondary row
-  const renameRow = (existingCount > 0 && allCount > 1)
-    ? `<div style="margin-top:6px"><button onclick="promptRenamePlaceholder()" style="${renameStyle};width:100%">Use different name</button></div>`
-    : "";
-
-  el.innerHTML = `
-    <div style="margin-bottom:8px">${description}${existingNote}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>${renameRow}`;
   el.className = "info";
   el.style.display = "block";
 }
