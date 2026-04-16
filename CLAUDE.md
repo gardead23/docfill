@@ -153,7 +153,11 @@ Six top-level state variables:
 Three states:
 1. **Idle** -- no text selected. Selection preview shows a dashed dropzone instruction box ("Highlight text in the document to begin"). Name input and Convert button are disabled (grayed out). The preview has `selection-idle` class styling.
 2. **Active** -- text selected (single paragraph only, multi-paragraph discarded). Selection preview switches to a blue `has-selection` style showing "SELECTED" label and the quoted text. Name input enabled with auto-suggested name and auto-focus. Convert button enabled.
-3. **Confirmation** -- multiple occurrences, case variants, or existing CCs detected. Inline confirmation dialog with options like "This one only", "All N matches", "Link to existing", "Use different name", "Cancel".
+3. **Confirmation** -- multiple occurrences, case variants, or existing CCs detected. Inline confirmation dialog whose language depends on whether the chosen name already has CCs in the document:
+   - **Existing field (Link language):** Header asks to "Link to your existing {{name}} field?" Buttons: "Link this one" / "Link all N" / Cancel. "Link N exact" button only appears when `exactCount > 1`. "Use different name" button shown full-width below the main buttons. A note explains "You already have a {{name}} field. Converting will link to the same field."
+   - **No existing field (Convert/Replace language):** Header asks "Replace with {{name}}?" Buttons: "This one only" / "All N matches" / Cancel. Single exact match with no variants shows just "Convert" + Cancel. "All N exact" button only appears when `exactCount > 1`.
+   - Headers always specify match type: "Found 2 exact" or "Found 2 exact and 1 with different capitalization"
+   - Variant-only matches (no exact) use `confirmReplace('all')` (case-insensitive search), not `'single'`
 
 **Selection loss problem:** Clicking task pane buttons loses the document selection. Solved by storing `lastSelectedText` from the debounced `DocumentSelectionChanged` event; the button handler uses the stored value, not the live selection.
 
@@ -164,7 +168,7 @@ Three states:
 **Occurrence counting:** Case-insensitive search across all bodies (`searchAllBodies()`) with `dedupeRanges()` to handle linked headers. Parent-CC check skips ranges inside any content control (not just DocFill CCs). Reports exact-case count vs. variant count separately.
 
 **Key conflict handling:**
-- If CCs for the chosen name already exist: "Link to existing" (adds to the same field) or "Use different name" (clears input, lets user rename)
+- If CCs for the chosen name already exist, the confirmation dialog switches to "Link" language (see Confirmation state above). "Use different name" button (full-width, secondary style) calls `promptRenamePlaceholder()`.
 - `promptRenamePlaceholder()` clears the name input, keeps the pending text, re-enables the Convert button
 
 **Placeholders list:**
