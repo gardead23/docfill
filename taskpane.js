@@ -1773,11 +1773,11 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
     // ── Existing field: "Link" wording ──
     // Preserve capitalization distinction in the description
     if (variantCount > 0 && exactCount > 0) {
-      description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong> and <strong>${variantCount}</strong> with different capitalization. Link to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
+      description = `Found <strong>${exactCount} exact</strong> and <strong>${variantCount}</strong> with different capitalization. Link to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
     } else if (exactCount === 0) {
       description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Link to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
     } else {
-      description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong>. Link ${allCount > 1 ? "them" : "it"} to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
+      description = `Found <strong>${allCount} exact match${allCount > 1 ? "es" : ""}</strong>. Link ${allCount > 1 ? "them" : "it"} to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
     }
 
     if (exactCount === 0) {
@@ -1821,7 +1821,7 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
         <button onclick="confirmReplace('all')" style="${btnStyle}">${allCount === 1 ? "Convert" : `All ${allCount} matches`}</button>
         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
     } else if (variantCount === 0) {
-      description = `Found <strong>${exactCount} match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
+      description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
       buttons = exactCount === 1
         ? `<button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
            <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
