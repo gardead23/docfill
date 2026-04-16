@@ -1771,27 +1771,38 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
   // When existing CCs exist, use "Link" language. Otherwise use "Convert/Replace" language.
   if (existingCount > 0) {
     // ── Existing field: "Link" wording ──
-    description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong>. Link ${allCount > 1 ? "them" : "it"} to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
-
-    if (allCount === 1) {
-      buttons = `
-        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
-        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
-    } else if (variantCount === 0) {
-      buttons = `
-        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
-        <button onclick="confirmReplace('exact')" style="${btnStyle}">Link all ${allCount}</button>
-        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    // Preserve capitalization distinction in the description
+    if (variantCount > 0 && exactCount > 0) {
+      description = `Found <strong>${exactCount} exact match${exactCount > 1 ? "es" : ""}</strong> and <strong>${variantCount}</strong> with different capitalization. Link to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
     } else if (exactCount === 0) {
+      description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong> with different capitalization. Link to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
+    } else {
+      description = `Found <strong>${allCount} match${allCount > 1 ? "es" : ""}</strong>. Link ${allCount > 1 ? "them" : "it"} to your existing <code>{{${escapeHtml(name)}}}</code> field?`;
+    }
+
+    if (exactCount === 0) {
+      // Only capitalization variants -- use 'all' mode (case-insensitive search)
       buttons = allCount === 1
         ? `<button onclick="confirmReplace('all')" style="${btnStyle}">Link this one</button>
            <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
         : `<button onclick="confirmReplace('all')" style="${btnStyle}">Link all ${allCount}</button>
            <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
-    } else {
+    } else if (allCount === 1) {
+      // Single exact match
       buttons = `
         <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
-        <button onclick="confirmReplace('exact')" style="${btnStyle}">Link ${exactCount} exact</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else if (variantCount === 0) {
+      // Multiple exact matches only
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
+        <button onclick="confirmReplace('exact')" style="${btnStyle}">Link all ${allCount}</button>
+        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+    } else {
+      // Exact + variants: show "Link this one", optionally "Link N exact", "Link all N"
+      buttons = `
+        <button onclick="confirmReplace('single')" style="${btnStyle}">Link this one</button>
+        ${exactCount > 1 ? `<button onclick="confirmReplace('exact')" style="${btnStyle}">Link ${exactCount} exact</button>` : ""}
         <button onclick="confirmReplace('all')" style="${btnStyle}">Link all ${allCount}</button>
         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
     }
