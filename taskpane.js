@@ -1822,10 +1822,12 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
     } else if (variantCount === 0) {
       description = `Found <strong>${exactCount} match${exactCount > 1 ? "es" : ""}</strong>. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
-      buttons = `
-        <button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
-        <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
-        <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
+      buttons = exactCount === 1
+        ? `<button onclick="confirmReplace('single')" style="${btnStyle}">Convert</button>
+           <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`
+        : `<button onclick="confirmReplace('single')" style="${btnStyle}">This one only</button>
+           <button onclick="confirmReplace('exact')" style="${btnStyle}">All ${exactCount} matches</button>
+           <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
     } else {
       description = `Found <strong>${exactCount} exact</strong> and <strong>${variantCount}</strong> with different capitalization. Replace with <code>{{${escapeHtml(name)}}}</code>?`;
       buttons = `
