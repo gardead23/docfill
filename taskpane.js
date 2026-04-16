@@ -1767,6 +1767,9 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
   const existingNote = existingCount > 0
     ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. Converting will link to the same field.</div>`
     : "";
+  const capsWarning = variantCount > 0
+    ? `<div style="${noteStyle}">Heads up: Linking words with different capitalization to one field means they'll all be replaced with the same value. This could affect grammar (e.g., a word at the start of a sentence vs. the middle).</div>`
+    : "";
 
   // When existing CCs exist, use "Link" language. Otherwise use "Convert/Replace" language.
   if (existingCount > 0) {
@@ -1810,7 +1813,7 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
     const renameRow = `<div style="margin-top:6px"><button onclick="promptRenamePlaceholder()" style="${renameStyle};width:100%">Use different name</button></div>`;
 
     el.innerHTML = `
-      <div style="margin-bottom:8px">${description}${existingNote}</div>
+      <div style="margin-bottom:8px">${description}${existingNote}${capsWarning}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>${renameRow}`;
 
   } else {
@@ -1838,7 +1841,7 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
     }
 
     el.innerHTML = `
-      <div style="margin-bottom:8px">${description}</div>
+      <div style="margin-bottom:8px">${description}${capsWarning}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
   }
   el.className = "info";
