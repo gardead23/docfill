@@ -1768,7 +1768,7 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
     ? `<div style="${noteStyle}">Note: You already have a {{${escapeHtml(name)}}} field. Converting will link to the same field.</div>`
     : "";
   const capsWarning = variantCount > 0
-    ? `<div style="${noteStyle}">Heads up: Linking words with different capitalization to one field means they'll all be replaced with the same value. This could affect grammar (e.g., a word at the start of a sentence vs. the middle).</div>`
+    ? `<div style="${noteStyle}">Heads up: ${existingCount > 0 ? "Linking" : "Grouping"} matches with different capitalization into one field means they'll all be replaced with the same value. This could affect grammar (e.g., a word at the start of a sentence vs. the middle).</div>`
     : "";
 
   // When existing CCs exist, use "Link" language. Otherwise use "Convert/Replace" language.
