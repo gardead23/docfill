@@ -707,6 +707,17 @@ textarea {
   background: #f9fafb;
 }
 
+.btn-ghost.active {
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .btn-clear {
   background: none;
   border: none;
@@ -1089,43 +1100,6 @@ textarea {
 }
 
 /* ── Import Panel ── */
-.fill-import-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.fill-import-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #f9fafb;
-  color: #6b7280;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-
-.fill-import-btn:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  color: #374151;
-}
-
-.fill-import-btn.active {
-  background: #eff6ff;
-  border-color: #93c5fd;
-  color: #2563eb;
-}
-
-.fill-import-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 #import-panel {
   position: relative;
   background: #ffffff;
