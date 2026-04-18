@@ -80,16 +80,6 @@ main {
   color: #6b7280;
   line-height: 1.6;
   margin-bottom: 24px;
-  max-width: 200px;
-}
-
-.empty-desc code {
-  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
-  font-size: 11px;
-  background: #e5e7eb;
-  color: #374151;
-  padding: 1px 5px;
-  border-radius: 4px;
 }
 
 /* ── Section bar ── */
@@ -126,7 +116,7 @@ main {
   box-shadow: 0 0 0 2px #2563eb28, 0 1px 3px rgba(0,0,0,0.06);
 }
 
-.field-label-input {
+.field-label-link {
   flex: 1;
   min-width: 0;
   font-family: inherit;
@@ -135,14 +125,66 @@ main {
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  background: none;
   border: none;
-  background: transparent;
   padding: 0;
   outline: none;
+  transition: color 0.15s;
 }
 
-.field-label-input::placeholder {
+.field-label-link:hover {
+  color: #2563eb;
+}
+
+.field-label-link:focus-visible {
+  color: #2563eb;
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.field-edit-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
   color: #d1d5db;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.field-edit-btn:hover {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.field-label-edit-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 2px 6px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  cursor: text;
 }
 
 /* ── Field top row (label + reset) ── */
@@ -153,20 +195,32 @@ main {
   margin-bottom: 4px;
 }
 
+.field-value-wrap {
+  position: relative;
+}
+
+.field-value-wrap .field-value-input,
+.field-value-wrap .date-dropdowns {
+  padding-right: 30px;
+}
+
 .field-reset-btn {
-  flex-shrink: 0;
+  position: absolute;
+  top: 8px;
+  right: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border: none;
   background: none;
-  color: #9ca3af;
+  color: #d1d5db;
   cursor: pointer;
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
   padding: 0;
+  z-index: 1;
 }
 
 .field-reset-btn:hover {
@@ -670,7 +724,6 @@ footer#create-actions {
 /* Explicit text cursor for all text-entry controls (Office WebView override) */
 .field-value-input,
 .field-value-textarea,
-.field-label-input,
 .fill-search,
 .created-list-search,
 input[type="text"],
@@ -726,10 +779,11 @@ textarea {
   font-weight: 500;
   color: #dc2626;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 4px 8px;
   text-align: center;
   opacity: 0.6;
   transition: opacity 0.15s, text-decoration 0.15s;
+  align-self: center;
 }
 
 .btn-clear:hover {

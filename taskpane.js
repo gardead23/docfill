@@ -423,8 +423,8 @@ async function scanDocument() {
         document.getElementById("fields-section").style.display = "none";
         document.getElementById("actions").style.display = "none";
         document.getElementById("empty-state").style.display = "block";
-        document.querySelector(".empty-desc").innerHTML =
-          'No <code>{{placeholders}}</code> found. Add fields like <code>{{client_name}}</code> to your document, then scan again.';
+        document.querySelector(".empty-desc").textContent =
+          'No {{placeholders}} found. Type fields like {{client_name}} into your document, then scan again.';
         setScanButtonLoading(false);
         return; // scanInProgress cleared in outer finally
       }
@@ -759,22 +759,21 @@ function renderForm(fields) {
 
     row.innerHTML = `
       <div class="field-top">
-        <input
-          class="field-label-input"
-          type="text"
-          value="${escapeAttr(field.label)}"
-          placeholder="Label"
-          onchange="onLabelChange('${escapeAttr(field.key)}', this.value)"
-        />
         <button
-          class="field-reset-btn"
-          id="reset-btn-${escapeAttr(field.key)}"
-          onclick="resetField('${escapeAttr(field.key)}')"
-          style="display:none"
+          type="button"
+          class="field-label-link"
+          id="label-${escapeAttr(field.key)}"
+          onclick="navigateToChip('${escapeAttr(field.key)}')"
+          title="Jump to {{${escapeAttr(field.key)}}} in document"
+        >${escapeHtml(field.label)}</button>
+        <button
+          type="button"
+          class="field-edit-btn"
+          onclick="startLabelEdit('${escapeAttr(field.key)}')"
+          title="Edit label"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M2 5.5A4 4 0 1 1 3.5 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M2 3v2.5h2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 1.5l2 2-6.5 6.5H2V8L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
       </div>
@@ -826,10 +825,26 @@ function renderGlobalDateFormat(fields) {
 
 function onGlobalDateFormatChange(format) { setGlobalDateFormat(format); }
 
+function buildResetBtn(key) {
+  return `<button
+    class="field-reset-btn"
+    id="reset-btn-${escapeAttr(key)}"
+    onclick="resetField('${escapeAttr(key)}')"
+    title="Clear value"
+    style="display:none"
+  >
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M2 5.5A4 4 0 1 1 3.5 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M2 3v2.5h2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>`;
+}
+
 function buildValueInput(field) {
   const id = `val-${field.key}`;
+  const resetBtn = buildResetBtn(field.key);
   if (field.type === "paragraph") {
-    return `<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea>`;
+    return `<div class="field-value-wrap">${resetBtn}<textarea id="${id}" class="field-value-textarea" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." rows="3"></textarea></div>`;
   }
   if (field.type === "date") {
     const globalFmt = getGlobalDateFormat();
@@ -842,12 +857,12 @@ function buildValueInput(field) {
       const y = curYear - 5 + i;
       return `<option value="${y}">${y}</option>`;
     }).join("");
-    return `<div class="date-dropdowns" id="${id}">
+    return `<div class="field-value-wrap">${resetBtn}<div class="date-dropdowns" id="${id}">
       <select class="date-select date-month" title="Month" onchange="updateDayOptions('${escapeAttr(field.key)}')"><option value="">Month</option>${monthOpts}</select>
       <select class="date-select date-day" title="Day"><option value="">Day</option>${dayOpts}</select>
       <select class="date-select date-year" title="Year" onchange="updateDayOptions('${escapeAttr(field.key)}')" ><option value="" selected>Year</option>${yearOpts}</select>
       <button type="button" class="date-today-btn" onclick="setDateToday('${escapeAttr(field.key)}')" title="Set to today">Today</button>
-    </div>
+    </div></div>
     <div class="date-format-row">
       <span class="date-format-label">Format:</span>
       <select class="date-format-select" id="datefmt-${field.key}" onchange="setFieldDateFormat('${escapeAttr(field.key)}', this.value)" title="Date output format">
@@ -856,7 +871,7 @@ function buildValueInput(field) {
       </select>
     </div>`;
   }
-  return `<input id="${id}" class="field-value-input" type="text" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." />`;
+  return `<div class="field-value-wrap">${resetBtn}<input id="${id}" class="field-value-input" type="text" placeholder="Enter ${escapeHtml(field.label).toLowerCase()}..." /></div>`;
 }
 
 // ── Field Edit Handlers ────────────────────────────────────────────────────────
@@ -870,11 +885,16 @@ function setFieldType(key, newType) {
   saveFieldConfigs(currentStorageKey, currentFields);
   const row = document.querySelector(`.field-row[data-key="${key}"]`);
   if (!row) return;
-  row.querySelectorAll(".field-value-input, .field-value-textarea, .date-dropdowns, .date-format-row").forEach((el) => el.remove());
+  row.querySelectorAll(".field-value-wrap, .field-value-input, .field-value-textarea, .date-dropdowns, .date-format-row").forEach((el) => el.remove());
   row.insertAdjacentHTML("beforeend", buildValueInput(field));
   if (newType !== "date") {
     const newInput = row.querySelector(".field-value-input, .field-value-textarea");
     if (newInput) newInput.value = oldValue;
+  }
+  // Re-show reset button if this field has been filled
+  if (lastFilledValues[key]) {
+    const resetBtn = document.getElementById(`reset-btn-${key}`);
+    if (resetBtn) resetBtn.style.display = "inline-flex";
   }
   row.querySelectorAll(".type-pill").forEach((pill) => {
     pill.classList.toggle("active", pill.dataset.type === newType);
@@ -913,16 +933,61 @@ function updateDayOptions(key) {
   if (currentDay > 0) daySel.value = currentDay > maxDay ? maxDay : currentDay;
 }
 
+function startLabelEdit(key) {
+  // Cancel any existing edit first
+  const existingEdit = document.querySelector(".field-label-edit-input");
+  if (existingEdit && existingEdit.dataset.key) {
+    finishLabelEdit(existingEdit.dataset.key, existingEdit.value);
+  }
+
+  const labelBtn = document.getElementById(`label-${key}`);
+  if (!labelBtn) return;
+  const field = currentFields.find((f) => f.key === key);
+  if (!field) return;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "field-label-edit-input";
+  input.dataset.key = key;
+  input.value = field.label;
+  input.onblur = function () { finishLabelEdit(key, input.value); };
+  input.onkeydown = function (e) {
+    if (e.key === "Enter") { input.blur(); }
+    if (e.key === "Escape") { input.value = field.label; input.blur(); }
+  };
+
+  labelBtn.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function finishLabelEdit(key, newLabel) {
+  const field = currentFields.find((f) => f.key === key);
+  if (!field) return;
+
+  const trimmed = newLabel.trim();
+  if (trimmed) field.label = trimmed;
+  saveFieldConfigs(currentStorageKey, currentFields);
+
+  // Find the edit input for this specific field
+  const input = document.querySelector(`.field-label-edit-input[data-key="${key}"]`);
+  if (!input) return;
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "field-label-link";
+  btn.id = `label-${key}`;
+  btn.onclick = function () { navigateToChip(key); };
+  btn.title = `Jump to {{${key}}} in document`;
+  btn.textContent = field.label;
+
+  input.replaceWith(btn);
+}
+
 function setFieldDateFormat(key, format) {
   const field = currentFields.find((f) => f.key === key);
   if (!field) return;
   field.dateFormat = format || undefined;
-  saveFieldConfigs(currentStorageKey, currentFields);
-}
-
-function onLabelChange(key, newLabel) {
-  const field = currentFields.find((f) => f.key === key);
-  if (field) field.label = newLabel;
   saveFieldConfigs(currentStorageKey, currentFields);
 }
 
@@ -2069,8 +2134,8 @@ async function checkForNewPlaceholders() {
         document.getElementById("fields-section").style.display = "none";
         document.getElementById("actions").style.display = "none";
         document.getElementById("empty-state").style.display = "block";
-        document.querySelector(".empty-desc").innerHTML =
-          'No <code>{{placeholders}}</code> found. Add fields like <code>{{client_name}}</code> to your document, then scan again.';
+        document.querySelector(".empty-desc").textContent =
+          'No {{placeholders}} found. Type fields like {{client_name}} into your document, then scan again.';
         return;
       }
 
