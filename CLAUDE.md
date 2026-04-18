@@ -325,6 +325,33 @@ Hosted on Cloudflare Pages with GitHub integration. Every push to `main` deploys
 - **Multi-paragraph selection** is not supported in Create mode. Only single-line text selections can be converted to placeholders.
 - **Selection targeting fallback:** In Create mode, when `confirmReplace('single')` cannot match the selection to a range (e.g., selection changed between click and execution), it shows an error asking the user to re-select.
 
+### Import
+
+Users can import field values from a CSV file or pasted text instead of typing each value manually. Import populates the form only -- user still reviews and clicks "Fill Document" to apply to the document.
+
+**UI:** Import button (down-arrow icon) in the fill toolbar next to the sort button. Opens an inline panel between the toolbar and the field list with two sections: file upload (.csv) and paste textarea. Button is disabled during HF scan.
+
+**Parsing:** Two paths -- `parseCSV()` (RFC 4180 state-machine, handles quoted fields) and `parsePastedText()` (auto-detects tab vs comma via `detectDelimiter()`, which is paste-only). Both return `{rows: [{key, value}], skippedEmpty: number}`. Header rows are skipped only when BOTH columns are header-like words (via `isHeaderRow(col1, col2)`). Rows with empty values are skipped and counted.
+
+**Key matching:** `normalizeImportKey(rawKey)` strips `{{braces}}`, replaces spaces/hyphens with underscores, lowercases, and removes non-word characters. `matchImportKeys(rows, fields)` normalizes both sides and matches. Deduplicates with last-wins; tracks duplicates with original imported keys for the summary.
+
+**Date parsing:** `parseDateValue(value)` supports ISO, US slash, day-first slash (when first number >12), month names (long and abbreviated), and dash formats. No `new Date()` fallback -- returns null if no explicit format matches. `setFieldValue()` dynamically adds out-of-range year options to the dropdown.
+
+**Summary buckets:** After import, the panel shows results in distinct categories with color coding:
+1. Filled (green) -- fields successfully populated
+2. Not recognized (red) -- imported keys that didn't match any placeholder
+3. Could not parse date (red) -- key matched a date field but value couldn't be parsed
+4. Empty values skipped (orange) -- rows with blank values
+5. Duplicate keys (orange) -- same key appeared multiple times, shows original imported keys
+
+Panel auto-closes after 3s only if completely clean (no warnings/errors). "Import different data" button resets to input state.
+
+**File guard:** Files >5MB rejected before FileReader runs.
+
+**No XLSX:** Deferred to avoid third-party runtime dependency (SheetJS). CSV + paste covers the core workflow since users can export or copy from Excel.
+
+**Pure functions:** `normalizeImportKey`, `isHeaderRow`, `detectDelimiter`, `parseCSV`, `parsePastedText`, `parseDateValue`, `matchImportKeys` -- all in both `lib/pure.mjs` (tested) and `taskpane.js` (inline duplicate).
+
 ## Testing
 
 Pure logic functions are extracted to `lib/pure.mjs` and tested with Vitest:
@@ -334,7 +361,7 @@ npm test           # run once
 npm run test:watch # watch mode
 ```
 
-58 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`, `isDocFillCC`, `ccTagToKey`, `keyToCCTag`, `placeholderText`, `isPlaceholderText`, `isPlaceholderTextForKey`, `isCCUnfilled`.
+135 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`, `isDocFillCC`, `ccTagToKey`, `keyToCCTag`, `placeholderText`, `isPlaceholderText`, `isPlaceholderTextForKey`, `isCCUnfilled`, `normalizeImportKey`, `isHeaderRow`, `detectDelimiter`, `parseCSV`, `parsePastedText`, `parseDateValue`, `matchImportKeys`.
 
 CI runs on every push/PR to `main` via GitHub Actions (`.github/workflows/ci.yml`): syntax check, manifest validation, and test suite.
 

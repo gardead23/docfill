@@ -1,0 +1,61 @@
+Key,Value
+client_name,Acme Corporation
+company_name,Smith & Wesson Legal Group
+contract_number,CTR-2026-0042
+prepared_by,Danny Garcia
+client_contact_name,John Smith
+client_contact_email,john@acmecorp.com
+client_address,"123 Main Street, Suite 400, Springfield IL 62701"
+company_address,"456 Corporate Blvd, Floor 12, New York NY 10001"
+project_manager,Sarah Chen
+technical_lead,Mike Rivera
+start_date,03/15/2026
+end_date,"September 30, 2026"
+effective_date,2026-04-01
+execution_date,"April 1, 2026"
+deadline,12/31/2026
+total_fee,"$125,000.00"
+project_scope,"Phase 1: Discovery and research
+Phase 2: Design and prototyping
+Phase 3: Development and testing
+Phase 4: Deployment and handoff"
+project_description,"Full platform redesign including mobile apps, web dashboard, and API layer"
+payment_terms,"Net 30 from invoice date. 50% due at signing, 25% at milestone 2, 25% on completion."
+agreement_subject,Platform Redesign and Development Services
+governing_law,State of New York
+jurisdiction,New York County
+notice_period,30 days
+warranty_period,12 months
+confidentiality_period,24 months
+liability_cap,"$250,000"
+milestone_1_name,Discovery Complete
+milestone_1_date,"January 15, 2026"
+milestone_1_deliverable,Research report and requirements document
+milestone_2_name,Design Approved
+milestone_2_date,04/30/2026
+milestone_2_deliverable,Wireframes and visual design mockups
+milestone_3_name,Development Complete
+milestone_3_date,2026-08-01
+milestone_3_deliverable,Deployed application with documentation
+signer_1_name,Danny Garcia
+signer_1_title,CEO
+signer_1_date,03/01/2026
+signer_2_name,John Smith
+signer_2_title,VP Operations
+signer_2_date,"May 1, 2026"
+witness_name,Maria Lopez
+witness_date,2026-03-01
+tech_platform,AWS
+tech_language,TypeScript
+tech_database,PostgreSQL
+repo_url,https://github.com/acme/platform-v2
+hosting_provider,Amazon Web Services
+hosting_region,us-east-1
+billing_contact,accounts@acmecorp.com
+billing_address,"PO Box 9876, Chicago IL 60601"
+insurance_type,Professional Liability
+insurance_amount,"$2,000,000"
+sla_service_name,Platform API
+sla_uptime_target,99.9%
+sla_response_time,4 hours
+sla_resolution_time,24 hours

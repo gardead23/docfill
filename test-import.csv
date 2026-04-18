@@ -1,0 +1,16 @@
+Key,Value
+client_name,Acme Corporation
+company_name,Smith & Wesson Legal Group
+contract_number,CTR-2026-0042
+prepared_by,Danny Garcia
+client_contact_name,John Smith
+client_contact_email,john@acmecorp.com
+start_date,03/15/2026
+end_date,"September 30, 2026"
+effective_date,2026-04-01
+total_fee,"$125,000.00"
+project_scope,"Phase 1: Discovery and research
+Phase 2: Design and prototyping
+Phase 3: Development and testing"
+project_manager,Sarah Chen
+technical_lead,Mike Rivera

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+
+  <!-- Different ID so both can be sideloaded at the same time -->
+  <Id>f2f32597-ec21-45f0-bd23-e70d741ca439</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>DocFill</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="DocFill (Test)"/>
+  <Description DefaultValue="LOCAL TEST BUILD -- Fill {{placeholders}} in your Word templates with a simple form."/>
+  <IconUrl DefaultValue="http://localhost:3000/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="http://localhost:3000/icon-128.png"/>
+  <SupportUrl DefaultValue="http://localhost:3000/support.html"/>
+
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="WordApi" MinVersion="1.3"/>
+    </Sets>
+  </Requirements>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="http://localhost:3000/taskpane.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <FunctionFile resid="Commands.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="TemplateFiller.TestGroup">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16"/>
+                  <bt:Image size="32" resid="Icon.32"/>
+                  <bt:Image size="80" resid="Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="TemplateFiller.TestButton">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>TemplateFillerTest</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="http://localhost:3000/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="http://localhost:3000/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="http://localhost:3000/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="http://localhost:3000/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="http://localhost:3000/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Group.Label" DefaultValue="DocFill (Test)"/>
+        <bt:String id="Button.Label" DefaultValue="DocFill (Test)"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Button.Tooltip" DefaultValue="LOCAL TEST -- Fill {{placeholders}} in your Word document"/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+
+</OfficeApp>

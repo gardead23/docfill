@@ -488,9 +488,13 @@ async function scanDocument() {
       hfStatusEl.style.display = "block";
     }
     if (fillBtn) { fillBtn.disabled = true; fillBtn.textContent = "Finishing setup..."; }
+    const importBtn = document.getElementById("fill-import-btn");
+    if (importBtn) importBtn.disabled = true;
+    closeImportPanel();
     scanHeaderFooters().then(() => {
       if (hfStatusEl) hfStatusEl.style.display = "none";
       if (fillBtn) { fillBtn.disabled = false; fillBtn.innerHTML = "Fill Document"; }
+      if (importBtn) importBtn.disabled = false;
       hasScannedOnce = true;
     });
   } finally {
@@ -932,6 +936,8 @@ function guessFieldType(key) {
 // ── Fill Document ──────────────────────────────────────────────────────────────
 // All fields are DocFill CCs after scan. Fill simply updates CC text.
 
+let fillInProgress = false;
+
 async function fillDocument() {
   const btn = document.getElementById("fill-btn");
   const allValues = collectValues();
@@ -964,6 +970,7 @@ async function fillDocument() {
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Filling...';
+  fillInProgress = true;
   hideStatus();
 
   try {
@@ -1017,6 +1024,8 @@ async function fillDocument() {
     }
   } catch (err) {
     showStatus("Error: " + err.message, "error");
+  } finally {
+    fillInProgress = false;
   }
 
   btn.disabled = false;
@@ -1242,6 +1251,546 @@ function doFormClear() {
   }
 }
 
+// ── Import ────────────────────────────────────────────────────────────────────
+// Import data from CSV file or pasted text to populate form fields.
+// Populates the form only -- user still clicks "Fill Document" to apply.
+
+const IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+let importAutoCloseTimer = null;
+let importGeneration = 0;
+let activeImportReader = null;
+
+const MONTH_NAMES = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+
+function normalizeImportKey(rawKey) {
+  return rawKey
+    .trim()
+    .replace(/^\{\{|\}\}$/g, "")
+    .trim()
+    .replace(/[\s-]+/g, "_")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "");
+}
+
+function isHeaderRow(col1, col2) {
+  const HEADER_WORDS = /^(key|field|name|placeholder|variable|value|header|column|label|data)$/i;
+  return HEADER_WORDS.test(col1.trim()) && HEADER_WORDS.test(col2.trim());
+}
+
+function detectDelimiter(line) {
+  const tabs = (line.match(/\t/g) || []).length;
+  const commas = (line.match(/,/g) || []).length;
+  return tabs >= commas && tabs > 0 ? "\t" : ",";
+}
+
+function parseCSV(text) {
+  if (!text || !text.trim()) return { rows: [], skippedEmpty: 0 };
+
+  const allRows = [];
+  let currentCell = "";
+  let currentRow = [];
+  let inQuotes = false;
+  const chars = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < chars.length && chars[i + 1] === '"') {
+          currentCell += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        currentCell += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        currentRow.push(currentCell);
+        currentCell = "";
+      } else if (ch === "\n") {
+        currentRow.push(currentCell);
+        allRows.push(currentRow);
+        currentRow = [];
+        currentCell = "";
+      } else {
+        currentCell += ch;
+      }
+    }
+  }
+  currentRow.push(currentCell);
+  if (currentRow.some((c) => c !== "")) {
+    allRows.push(currentRow);
+  }
+
+  const rows = [];
+  let skippedEmpty = 0;
+  let isFirst = true;
+
+  for (const cells of allRows) {
+    if (cells.length < 2) continue;
+    const key = cells[0].trim();
+    const value = cells[1].trim();
+    if (!key) continue;
+
+    if (isFirst) {
+      isFirst = false;
+      if (isHeaderRow(key, value)) continue;
+    }
+
+    if (!value) {
+      skippedEmpty++;
+      continue;
+    }
+
+    rows.push({ key, value });
+  }
+
+  return { rows, skippedEmpty };
+}
+
+function parsePastedText(text) {
+  if (!text || !text.trim()) return { rows: [], skippedEmpty: 0 };
+
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  const nonEmpty = lines.filter((l) => l.trim());
+  if (nonEmpty.length === 0) return { rows: [], skippedEmpty: 0 };
+
+  const delimiter = detectDelimiter(nonEmpty[0]);
+
+  const rows = [];
+  let skippedEmpty = 0;
+  let isFirst = true;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const parts = line.split(delimiter);
+    if (parts.length < 2) continue;
+    const key = parts[0].trim();
+    const value = parts.slice(1).join(delimiter).trim();
+    if (!key) continue;
+
+    if (isFirst) {
+      isFirst = false;
+      if (isHeaderRow(key, value)) continue;
+    }
+
+    if (!value) {
+      skippedEmpty++;
+      continue;
+    }
+
+    rows.push({ key, value });
+  }
+
+  return { rows, skippedEmpty };
+}
+
+function parseDateValue(value) {
+  if (!value || !value.trim()) return null;
+  const v = value.trim();
+
+  function validDate(month, day, year) {
+    return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(month, year);
+  }
+
+  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) {
+    const year = parseInt(m[1], 10), month = parseInt(m[2], 10), day = parseInt(m[3], 10);
+    if (validDate(month, day, year)) return { month, day, year };
+  }
+
+  m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10), year = parseInt(m[3], 10);
+    if (a > 12 && b >= 1 && b <= 12 && validDate(b, a, year)) return { month: b, day: a, year };
+    if (validDate(a, b, year)) return { month: a, day: b, year };
+  }
+
+  m = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) {
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10), year = parseInt(m[3], 10);
+    if (a > 12 && b >= 1 && b <= 12 && validDate(b, a, year)) return { month: b, day: a, year };
+    if (validDate(a, b, year)) return { month: a, day: b, year };
+  }
+
+  m = v.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})$/);
+  if (m) {
+    const monthStr = m[1].toLowerCase();
+    const day = parseInt(m[2], 10), year = parseInt(m[3], 10);
+    const monthIdx = MONTH_NAMES.findIndex((n) => n.startsWith(monthStr));
+    if (monthIdx !== -1 && validDate(monthIdx + 1, day, year)) return { month: monthIdx + 1, day, year };
+  }
+
+  return null;
+}
+
+function matchImportKeys(rows, fields) {
+  const fieldLookup = Object.create(null);
+  for (const f of fields) {
+    fieldLookup[normalizeImportKey(f.key)] = f.key;
+  }
+
+  const matchMap = Object.create(null);
+  const unmatched = [];
+
+  for (const row of rows) {
+    const normalized = normalizeImportKey(row.key);
+    if (!normalized) {
+      unmatched.push({ key: row.key, value: row.value });
+      continue;
+    }
+
+    const fieldKey = fieldLookup[normalized];
+    if (!fieldKey) {
+      unmatched.push({ key: row.key, value: row.value });
+      continue;
+    }
+
+    if (!matchMap[normalized]) {
+      matchMap[normalized] = { fieldKey, value: row.value, originalKeys: [row.key] };
+    } else {
+      matchMap[normalized].value = row.value;
+      matchMap[normalized].originalKeys.push(row.key);
+    }
+  }
+
+  const matched = [];
+  const duplicates = [];
+
+  for (const normalized of Object.keys(matchMap)) {
+    const entry = matchMap[normalized];
+    matched.push({ fieldKey: entry.fieldKey, value: entry.value });
+    if (entry.originalKeys.length > 1) {
+      duplicates.push({ normalizedKey: entry.fieldKey, originalKeys: entry.originalKeys });
+    }
+  }
+
+  return { matched, unmatched, duplicates };
+}
+
+// ── Import UI ──────────────────────────────────────────────────────────────────
+
+function toggleImportPanel() {
+  if (hfScanInProgress || scanInProgress || fillInProgress) return;
+  const panel = document.getElementById("import-panel");
+  const btn = document.getElementById("fill-import-btn");
+  if (!panel) return;
+
+  if (panel.style.display === "none" || !panel.style.display) {
+    panel.style.display = "block";
+    btn?.classList.add("active");
+    renderImportPanel();
+  } else {
+    closeImportPanel();
+  }
+}
+
+function closeImportPanel() {
+  if (importAutoCloseTimer) { clearTimeout(importAutoCloseTimer); importAutoCloseTimer = null; }
+  importGeneration++;
+  if (activeImportReader && activeImportReader.readyState === FileReader.LOADING) {
+    activeImportReader.abort();
+  }
+  activeImportReader = null;
+  const panel = document.getElementById("import-panel");
+  const btn = document.getElementById("fill-import-btn");
+  if (panel) {
+    panel.style.display = "none";
+    panel.innerHTML = "";
+  }
+  btn?.classList.remove("active");
+}
+
+function renderImportPanel() {
+  if (importAutoCloseTimer) { clearTimeout(importAutoCloseTimer); importAutoCloseTimer = null; }
+  const panel = document.getElementById("import-panel");
+  if (!panel) return;
+
+  panel.innerHTML = `
+    <button class="import-close-btn" onclick="closeImportPanel()" title="Close">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <div class="import-section-label">Upload a spreadsheet</div>
+    <button class="import-file-label" type="button" onclick="document.getElementById('import-file-input').click()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 10V3M4 5.5l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 10v2h10v-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Choose .csv file
+    </button>
+    <input class="import-file-input" type="file" id="import-file-input" accept=".csv" onchange="onImportFileSelected(event)" />
+    <div class="import-divider">or</div>
+    <label class="import-section-label" for="import-paste-area">Paste your data</label>
+    <textarea class="import-paste-area" id="import-paste-area" placeholder="Paste two columns here (field name and value)..."></textarea>
+    <div class="import-paste-hint">Tab-separated or comma-separated</div>
+    <button class="import-paste-btn" onclick="onPasteImport()">Import pasted data</button>
+  `;
+}
+
+function onImportFileSelected(event) {
+  // Cancel any in-flight file read from a previous selection
+  importGeneration++;
+  if (activeImportReader && activeImportReader.readyState === FileReader.LOADING) {
+    activeImportReader.abort();
+  }
+  activeImportReader = null;
+
+  if (hfScanInProgress || scanInProgress || fillInProgress) {
+    showImportSummary({ error: "Still finishing document setup. Please wait a moment." });
+    return;
+  }
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (file.size > IMPORT_MAX_FILE_SIZE) {
+    showImportSummary({ error: "File is too large (max 5MB). Try a smaller file or paste your data instead." });
+    return;
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext !== "csv") {
+    showImportSummary({ error: "Please select a .csv file." });
+    return;
+  }
+
+  const gen = importGeneration;
+  const reader = new FileReader();
+  activeImportReader = reader;
+  reader.onload = function (e) {
+    activeImportReader = null;
+    if (gen !== importGeneration) return; // panel was closed or new import started
+    if (hfScanInProgress || scanInProgress || fillInProgress) {
+      showImportSummary({ error: "Document is being scanned. Please try again in a moment." });
+      return;
+    }
+    const text = e.target?.result;
+    if (typeof text !== "string") {
+      showImportSummary({ error: "Could not read the file. Please try again." });
+      return;
+    }
+    const parseResult = parseCSV(text);
+    applyImportData(parseResult);
+  };
+  reader.onerror = function () {
+    activeImportReader = null;
+    if (gen !== importGeneration) return;
+    showImportSummary({ error: "Could not read the file. Please try again." });
+  };
+  reader.readAsText(file);
+}
+
+function onPasteImport() {
+  // Cancel any in-flight file read first (before scan guard, so stale reads never land)
+  importGeneration++;
+  if (activeImportReader && activeImportReader.readyState === FileReader.LOADING) {
+    activeImportReader.abort();
+  }
+  activeImportReader = null;
+
+  if (hfScanInProgress || scanInProgress || fillInProgress) {
+    showImportSummary({ error: "Still finishing document setup. Please wait a moment." });
+    return;
+  }
+  const textarea = document.getElementById("import-paste-area");
+  const text = textarea ? textarea.value : "";
+  if (!text.trim()) {
+    showImportSummary({ error: "Paste some data first, then click Import." });
+    return;
+  }
+  const parseResult = parsePastedText(text);
+  applyImportData(parseResult);
+}
+
+/**
+ * Set a single form field's value programmatically.
+ * Returns false if the field is a date type and parsing failed.
+ */
+function setFieldValue(fieldKey, value) {
+  const field = currentFields.find((f) => f.key === fieldKey);
+  if (!field) return false;
+
+  // Clear any prior empty-field validation styling
+  const fieldRow = document.querySelector(`.field-row[data-key="${fieldKey}"]`);
+  if (fieldRow) fieldRow.classList.remove("field-empty");
+
+  if (field.type === "date") {
+    const parsed = parseDateValue(value);
+    if (!parsed) return false;
+
+    const container = document.getElementById(`val-${fieldKey}`);
+    if (!container) return false;
+
+    const monthSel = container.querySelector(".date-month");
+    const daySel = container.querySelector(".date-day");
+    const yearSel = container.querySelector(".date-year");
+    if (!monthSel || !daySel || !yearSel) return false;
+
+    // Add year option if outside dropdown range
+    const yearStr = String(parsed.year);
+    if (!yearSel.querySelector(`option[value="${yearStr}"]`)) {
+      const opt = document.createElement("option");
+      opt.value = yearStr;
+      opt.textContent = yearStr;
+      // Insert in sorted position
+      const options = Array.from(yearSel.options);
+      const insertBefore = options.find((o) => o.value && parseInt(o.value, 10) > parsed.year);
+      if (insertBefore) {
+        yearSel.insertBefore(opt, insertBefore);
+      } else {
+        yearSel.appendChild(opt);
+      }
+    }
+
+    monthSel.value = String(parsed.month);
+    yearSel.value = yearStr;
+    updateDayOptions(fieldKey);
+    daySel.value = String(parsed.day);
+    return true;
+  }
+
+  // Text or paragraph
+  const el = document.getElementById(`val-${fieldKey}`);
+  if (!el) return false;
+  el.value = value;
+  return true;
+}
+
+function applyImportData(parseResult) {
+  const { rows, skippedEmpty } = parseResult;
+
+  if (rows.length === 0) {
+    const msg = skippedEmpty > 0
+      ? "All rows had empty values. No data to import."
+      : "No data found to import. Expected two columns: field name and value.";
+    showImportSummary({ error: msg, skippedEmpty });
+    return;
+  }
+
+  const result = matchImportKeys(rows, currentFields);
+
+  if (result.matched.length === 0) {
+    const keys = result.unmatched.slice(0, 5).map((r) => r.key).join(", ");
+    const more = result.unmatched.length > 5 ? `, and ${result.unmatched.length - 5} more` : "";
+    showImportSummary({
+      error: `No matching fields found. Imported keys: ${keys}${more}`,
+      skippedEmpty,
+    });
+    return;
+  }
+
+  // Populate form fields and track invalid dates
+  const invalidDates = [];
+  let filledCount = 0;
+
+  for (const { fieldKey, value } of result.matched) {
+    const success = setFieldValue(fieldKey, value);
+    if (success) {
+      filledCount++;
+    } else {
+      invalidDates.push({ key: fieldKey, value });
+    }
+  }
+
+  showImportSummary({
+    filledCount,
+    unmatched: result.unmatched,
+    skippedEmpty,
+    invalidDates,
+    duplicates: result.duplicates,
+  });
+
+  // Panel stays open until user dismisses via Done or X
+}
+
+function showImportSummary(data) {
+  const panel = document.getElementById("import-panel");
+  if (!panel) return;
+
+  // No X button on summary screen -- Done button handles dismissal
+  let html = '<div class="import-summary" role="status" aria-live="polite">';
+
+  if (data.error) {
+    html += `<div class="import-summary-bucket import-summary-error-bucket">${escapeHtml(data.error)}</div>`;
+    if (data.skippedEmpty && data.skippedEmpty > 0) {
+      const noun = data.skippedEmpty === 1 ? "row" : "rows";
+      html += `<div class="import-summary-bucket import-summary-warning-bucket">${data.skippedEmpty} ${noun} with empty values skipped</div>`;
+    }
+  } else {
+    // Filled bucket
+    if (data.filledCount > 0) {
+      const noun = data.filledCount === 1 ? "field" : "fields";
+      html += `<div class="import-summary-bucket import-summary-filled-bucket">${data.filledCount} ${noun} filled</div>`;
+    }
+
+    // Unrecognized bucket (bulleted if multiple)
+    if (data.unmatched && data.unmatched.length > 0) {
+      const n = data.unmatched.length;
+      if (n === 1) {
+        html += `<div class="import-summary-bucket import-summary-error-bucket">1 not recognized: ${escapeHtml(data.unmatched[0].key)}</div>`;
+      } else {
+        html += `<div class="import-summary-bucket import-summary-error-bucket">${n} not recognized:<ul class="import-summary-list">`;
+        const toShow = data.unmatched.slice(0, 8);
+        for (const r of toShow) {
+          html += `<li>${escapeHtml(r.key)}</li>`;
+        }
+        if (n > 8) html += `<li>and ${n - 8} more</li>`;
+        html += '</ul></div>';
+      }
+    }
+
+    // Invalid dates bucket (bulleted if multiple)
+    if (data.invalidDates && data.invalidDates.length > 0) {
+      const n = data.invalidDates.length;
+      if (n === 1) {
+        html += `<div class="import-summary-bucket import-summary-error-bucket">Could not parse date for ${escapeHtml(data.invalidDates[0].key)}: "${escapeHtml(data.invalidDates[0].value)}"</div>`;
+      } else {
+        html += `<div class="import-summary-bucket import-summary-error-bucket">Could not parse ${n} dates:<ul class="import-summary-list">`;
+        for (const d of data.invalidDates) {
+          html += `<li>${escapeHtml(d.key)}: "${escapeHtml(d.value)}"</li>`;
+        }
+        html += '</ul></div>';
+      }
+    }
+
+    // Skipped empty bucket
+    if (data.skippedEmpty && data.skippedEmpty > 0) {
+      const noun = data.skippedEmpty === 1 ? "row" : "rows";
+      html += `<div class="import-summary-bucket import-summary-warning-bucket">${data.skippedEmpty} ${noun} with empty values skipped</div>`;
+    }
+
+    // Duplicates bucket (bulleted if multiple)
+    if (data.duplicates && data.duplicates.length > 0) {
+      const n = data.duplicates.length;
+      if (n === 1) {
+        const dup = data.duplicates[0];
+        const originals = dup.originalKeys.slice(0, 5).map((k) => escapeHtml(k)).join(", ");
+        html += `<div class="import-summary-bucket import-summary-warning-bucket">${escapeHtml(dup.normalizedKey)} appeared ${dup.originalKeys.length} times (${originals}); used the last value</div>`;
+      } else {
+        html += `<div class="import-summary-bucket import-summary-warning-bucket">${n} fields had duplicate keys:<ul class="import-summary-list">`;
+        const dupsToShow = data.duplicates.slice(0, 5);
+        for (const dup of dupsToShow) {
+          const originals = dup.originalKeys.slice(0, 5).map((k) => escapeHtml(k)).join(", ");
+          html += `<li>${escapeHtml(dup.normalizedKey)}: ${originals}</li>`;
+        }
+        if (n > 5) html += `<li>and ${n - 5} more</li>`;
+        html += '</ul></div>';
+      }
+    }
+  }
+
+  html += '</div>';
+  html += '<button class="import-done-btn" onclick="closeImportPanel()">Done</button>';
+  html += '<button class="import-retry-btn" onclick="renderImportPanel()">Import different data</button>';
+
+  panel.innerHTML = html;
+}
+
 // ── localStorage ───────────────────────────────────────────────────────────────
 
 const LS_PREFIX = "template-filler:";
@@ -1421,6 +1970,8 @@ function switchTab(tab) {
  * scan (converts new raw text, rebuilds form from CCs). No HF loading.
  */
 async function checkForNewPlaceholders() {
+  if (scanInProgress || hfScanInProgress) return;
+  scanInProgress = true;
   try {
     await Word.run(async (context) => {
       const body = context.document.body;
@@ -1551,6 +2102,8 @@ async function checkForNewPlaceholders() {
     });
   } catch {
     // Best effort
+  } finally {
+    scanInProgress = false;
   }
 }
 

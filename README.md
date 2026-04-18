@@ -112,11 +112,11 @@ docfill/
 +-- manifest.xml           <- Office add-in descriptor (points to Cloudflare Pages URL)
 +-- taskpane.html          <- task pane UI
 +-- taskpane.css           <- styles
-+-- taskpane.js            <- all add-in logic (scan, fill, reset, create, localStorage)
++-- taskpane.js            <- all add-in logic (scan, fill, reset, create, import, localStorage)
 +-- lib/
 |   +-- pure.mjs           <- pure helper functions (extracted for testability)
 +-- tests/
-|   +-- pure.test.js       <- Vitest unit tests (58 tests)
+|   +-- pure.test.js       <- Vitest unit tests (135 tests)
 +-- commands.html          <- required Office command surface shell
 +-- privacy.html           <- privacy policy (required for AppSource)
 +-- support.html           <- support/help page (required for AppSource)
@@ -169,6 +169,7 @@ npm run test:watch # watch mode
 - **Labels are saved** per template -- your customizations persist across sessions
 - **Headers and footers supported:** DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported
 - **Multi-line text:** Long text fields support multiple lines. Line breaks are preserved inside the document using soft line breaks (same paragraph formatting is maintained)
+- **Import data:** Click the import button (down-arrow icon) in the Fill toolbar to populate fields from a CSV file or by pasting two-column data (field name + value). DocFill matches keys case-insensitively and handles spaces, underscores, hyphens, and `{{braces}}` interchangeably. A summary shows exactly what was filled, what wasn't recognized, and any date parsing issues. Fields are populated in the form for review before you click Fill Document.
 
 ---
 

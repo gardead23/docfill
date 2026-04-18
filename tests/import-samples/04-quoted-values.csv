@@ -1,0 +1,13 @@
+Key,Value
+client_name,"Smith, Jones & Associates"
+client_address,"123 Main Street, Suite 400, Springfield IL 62701"
+company_address,"456 Corporate Blvd, Floor 12, New York NY 10001"
+billing_address,"PO Box 9876, Chicago IL 60601"
+total_fee,"$125,000.00"
+project_scope,"Phase 1: Discovery and research
+Phase 2: Design and prototyping
+Phase 3: Development and testing
+Phase 4: Deployment and handoff"
+payment_terms,"Net 30 from invoice date. 50% due at signing, 25% at milestone 2, 25% on completion."
+indemnification_scope,"All claims arising from negligence, breach of contract, or willful misconduct"
+force_majeure_events,"Natural disasters, pandemics, government actions, and ""acts of God"""
