@@ -79,6 +79,11 @@ let lastSuggestedName = "";
 let createdPlaceholders = [];
 let pendingCreateText = "";
 let pendingCreateName = "";
+let pendingMatchCount = 0;
+let pendingMatchIndex = 0;
+let pendingMatchCase = true;
+let pendingMatchWholeWord = true;
+let matchNavInFlight = false;
 const chipNavIndex = {};
 let selectionDebounceTimer = null;
 let selectionFetchInProgress = false;
@@ -2643,9 +2648,41 @@ async function createPlaceholder() {
         shouldProceed = false;
         pendingCreateText = text;
         pendingCreateName = name;
+        pendingMatchCase = false; // case-insensitive to show ALL matches
+        pendingMatchWholeWord = wholeWord;
+        // Only enable match navigation for 2+ matches (nav bar not shown for single match)
+        pendingMatchCount = allCount > 1 ? allCount : 0;
+
+        // Find which match the user's selection is at/near (only for 2+ matches)
+        if (pendingMatchCount > 0) {
+          const sel = context.document.getSelection();
+          const comparisons = allItems.map((r) => sel.compareLocationWith(r));
+          await context.sync();
+          let startIdx = 0;
+          for (let i = 0; i < comparisons.length; i++) {
+            const v = comparisons[i].value;
+            if (v === "Equal" || v === "Inside" || v === "Contains" ||
+                v === "ContainsStart" || v === "ContainsEnd" ||
+                v === "InsideStart" || v === "InsideEnd" ||
+                v === Word.LocationRelation.equal || v === Word.LocationRelation.inside ||
+                v === Word.LocationRelation.contains ||
+                v === Word.LocationRelation.containsStart || v === Word.LocationRelation.containsEnd ||
+                v === Word.LocationRelation.insideStart || v === Word.LocationRelation.insideEnd) {
+              startIdx = i;
+              break;
+            }
+          }
+          pendingMatchIndex = startIdx;
+        }
+
         showReplaceAllConfirm(exactCount, allCount, name, existingCount);
       }
     });
+
+    // Auto-navigate to the initial match after Word.run completes
+    if (!shouldProceed && allCount > 1) {
+      navigateMatch(0);
+    }
 
     if (!shouldProceed && allCount === 0 && !document.querySelector("#create-status.info")) {
       showCreateStatus("Could not find that text in the document -- try selecting it again.", "error");
@@ -2721,7 +2758,13 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
 
     const renameRow = `<div style="margin-top:6px"><button onclick="promptRenamePlaceholder()" style="${renameStyle};width:100%">Use different name</button></div>`;
 
-    el.innerHTML = `
+    const navBar = pendingMatchCount > 1 ? `<div class="match-nav">
+      <button class="match-nav-btn" id="match-nav-prev" onclick="navigateMatch(-1)" title="Previous match"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="match-nav-label" id="match-nav-label">${pendingMatchIndex + 1} of ${pendingMatchCount}</span>
+      <button class="match-nav-btn" id="match-nav-next" onclick="navigateMatch(1)" title="Next match"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>` : "";
+
+    el.innerHTML = `${navBar}
       <div style="margin-bottom:8px">${description}${existingNote}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>${renameRow}`;
 
@@ -2749,7 +2792,13 @@ function showReplaceAllConfirm(exactCount, allCount, name, existingCount) {
         <button onclick="cancelCreateAction()" style="${cancelStyle}">Cancel</button>`;
     }
 
-    el.innerHTML = `
+    const navBar = pendingMatchCount > 1 ? `<div class="match-nav">
+      <button class="match-nav-btn" id="match-nav-prev" onclick="navigateMatch(-1)" title="Previous match"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="match-nav-label" id="match-nav-label">${pendingMatchIndex + 1} of ${pendingMatchCount}</span>
+      <button class="match-nav-btn" id="match-nav-next" onclick="navigateMatch(1)" title="Next match"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>` : "";
+
+    el.innerHTML = `${navBar}
       <div style="margin-bottom:8px">${description}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${buttons}</div>`;
   }
@@ -2778,8 +2827,19 @@ async function confirmReplace(mode) {
   hideCreateStatus();
   const text = pendingCreateText;
   const name = pendingCreateName;
+  const savedMatchIndex = pendingMatchIndex;
+  const hadMatchNav = pendingMatchCount > 0;
+
+  // Clear match state before async work
   pendingCreateText = "";
   pendingCreateName = "";
+  pendingMatchCount = 0;
+  pendingMatchIndex = 0;
+  pendingMatchCase = true;
+  pendingMatchWholeWord = true;
+  matchNavInFlight = false;
+  chipNavGeneration++;
+  suppressSelectionPreview = false;
   if (!text || !name) return;
 
   const btn = document.getElementById("create-replace-btn");
@@ -2790,10 +2850,34 @@ async function confirmReplace(mode) {
     let count = 0;
 
     await Word.run(async (context) => {
-      const matchCase = mode === "single" || mode === "exact";
+      // When match navigation was active, use case-insensitive body-only search + index
+      // (matches navigateMatch's search scope so indices align)
+      const useMatchIndex = hadMatchNav && mode === "single";
+      const matchCase = useMatchIndex ? false : (mode === "single" || mode === "exact");
       const wholeWord = /^\w+(\s+\w+)*$/.test(text);
-      const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: wholeWord });
-      const items = await dedupeRanges(context, rawItems);
+      let items;
+      if (useMatchIndex) {
+        // Body first, fall back to full search if no free body matches
+        const bodyResults = context.document.body.search(text, { matchCase, matchWholeWord: wholeWord });
+        bodyResults.load("items");
+        await context.sync();
+        // Check for free (non-CC) body matches
+        let bodyFree = bodyResults.items;
+        if (bodyFree.length > 0) {
+          for (const r of bodyFree) r.parentContentControlOrNullObject.load("isNullObject");
+          await context.sync();
+          bodyFree = bodyFree.filter((r) => r.parentContentControlOrNullObject.isNullObject);
+        }
+        if (bodyFree.length > 0) {
+          items = bodyResults.items; // use full body items for CC filtering below
+        } else {
+          const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: wholeWord });
+          items = await dedupeRanges(context, rawItems);
+        }
+      } else {
+        const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: wholeWord });
+        items = await dedupeRanges(context, rawItems);
+      }
       if (items.length === 0) return;
 
       // Check parent CCs to skip ranges already inside DocFill controls
@@ -2809,21 +2893,28 @@ async function confirmReplace(mode) {
       if (freeRanges.length === 0) return;
 
       if (mode === "single") {
-        // Find the free range that matches the user's current selection
         let idx = -1;
-        const sel = context.document.getSelection();
-        for (let i = 0; i < freeRanges.length; i++) {
-          const loc = sel.compareLocationWith(freeRanges[i]);
-          await context.sync();
-          const v = loc.value;
-          if (v === "Equal" || v === "Inside" || v === "Contains" ||
-              v === Word.LocationRelation.equal ||
-              v === Word.LocationRelation.inside ||
-              v === Word.LocationRelation.contains) {
-            idx = i;
-            break;
+
+        if (useMatchIndex) {
+          // Use the navigated match index directly
+          idx = savedMatchIndex < freeRanges.length ? savedMatchIndex : -1;
+        } else {
+          // Fallback: find by selection position (original behavior)
+          const sel = context.document.getSelection();
+          for (let i = 0; i < freeRanges.length; i++) {
+            const loc = sel.compareLocationWith(freeRanges[i]);
+            await context.sync();
+            const v = loc.value;
+            if (v === "Equal" || v === "Inside" || v === "Contains" ||
+                v === Word.LocationRelation.equal ||
+                v === Word.LocationRelation.inside ||
+                v === Word.LocationRelation.contains) {
+              idx = i;
+              break;
+            }
           }
         }
+
         if (idx === -1) {
           showCreateStatus("Selection changed. Please select the text again.", "error");
           return;
@@ -3057,6 +3148,11 @@ async function navigateToChip(name) {
   // Clear stale Create action state
   pendingCreateText = "";
   pendingCreateName = "";
+  pendingMatchCount = 0;
+  pendingMatchIndex = 0;
+  pendingMatchCase = true;
+  pendingMatchWholeWord = true;
+  matchNavInFlight = false;
   lastSelectedText = "";
   lastSuggestedName = "";
   clearTimeout(selectionDebounceTimer);
@@ -3133,6 +3229,107 @@ async function navigateToChip(name) {
 
 /** Show a floating toast that doesn't shift layout. Auto-dismisses after 2s. */
 let chipToastTimer = null;
+// ── Match Navigation (Create Mode Confirmation) ─────────────────────────────
+
+async function navigateMatch(delta) {
+  if (matchNavInFlight) return;
+  matchNavInFlight = true;
+
+  pendingMatchIndex += delta;
+  // Wrap around
+  if (pendingMatchIndex < 0) pendingMatchIndex = pendingMatchCount - 1;
+  if (pendingMatchIndex >= pendingMatchCount) pendingMatchIndex = 0;
+
+  // Disable all dialog buttons except Cancel during navigation
+  const dialog = document.getElementById("create-status");
+  if (dialog) dialog.querySelectorAll("button:not([onclick*='cancel'])").forEach((b) => { b.disabled = true; });
+
+  const scrollSnapshot = captureTaskPaneScroll();
+  chipNavGeneration++;
+  const myGeneration = chipNavGeneration;
+  startTaskPaneScrollLock(scrollSnapshot, myGeneration);
+  suppressSelectionPreview = true;
+  clearTimeout(suppressionTimer);
+  selectionFetchGeneration++;
+
+  try {
+    await Word.run(async (context) => {
+      // Search body first for speed; fall back to full search if no free body matches
+      const searchOpts = { matchCase: pendingMatchCase, matchWholeWord: pendingMatchWholeWord };
+      const bodyResults = context.document.body.search(pendingCreateText, searchOpts);
+      bodyResults.load("items");
+      await context.sync();
+
+      // Check body results for free (non-CC) matches
+      let searchItems = bodyResults.items;
+      let parentChecks = searchItems.map((r) => {
+        const p = r.parentContentControlOrNullObject;
+        p.load("isNullObject");
+        return p;
+      });
+      if (searchItems.length > 0) await context.sync();
+      let freeRanges = searchItems.filter((_, i) => parentChecks[i].isNullObject);
+
+      // Fall back to full search if no free body matches
+      if (freeRanges.length === 0) {
+        const allItems = await searchAllBodies(context, pendingCreateText, searchOpts);
+        const deduped = await dedupeRanges(context, allItems);
+        searchItems = deduped;
+        parentChecks = searchItems.map((r) => {
+          const p = r.parentContentControlOrNullObject;
+          p.load("isNullObject");
+          return p;
+        });
+        if (searchItems.length > 0) await context.sync();
+        freeRanges = searchItems.filter((_, i) => parentChecks[i].isNullObject);
+      }
+
+      if (chipNavGeneration !== myGeneration) return;
+
+      pendingMatchCount = freeRanges.length;
+      if (pendingMatchIndex >= pendingMatchCount) {
+        pendingMatchIndex = Math.max(0, pendingMatchCount - 1);
+      }
+
+      if (pendingMatchCount > 0 && pendingMatchIndex < freeRanges.length) {
+        startTaskPaneScrollLock(scrollSnapshot, myGeneration);
+        freeRanges[pendingMatchIndex].select();
+        await context.sync();
+        startTaskPaneScrollLock(scrollSnapshot, myGeneration);
+      }
+    });
+  } catch { /* best effort */ }
+
+  matchNavInFlight = false;
+
+  if (chipNavGeneration !== myGeneration) return;
+
+  updateMatchCounter();
+
+  suppressionTimer = setTimeout(() => {
+    if (chipNavGeneration === myGeneration) suppressSelectionPreview = false;
+  }, 500);
+}
+
+function updateMatchCounter() {
+  const label = document.getElementById("match-nav-label");
+  const prevBtn = document.getElementById("match-nav-prev");
+  const nextBtn = document.getElementById("match-nav-next");
+
+  if (pendingMatchCount === 0) {
+    if (label) label.textContent = "No matches found";
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    const dialog = document.getElementById("create-status");
+    if (dialog) dialog.querySelectorAll("button:not([onclick*='cancel'])").forEach((b) => { b.disabled = true; });
+  } else {
+    if (label) label.textContent = `${pendingMatchIndex + 1} of ${pendingMatchCount}`;
+    // Re-enable all buttons (nav buttons always enabled for wrap-around)
+    const dialog = document.getElementById("create-status");
+    if (dialog) dialog.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+  }
+}
+
 function showChipToast(msg) {
   let toast = document.getElementById("chip-toast");
   if (!toast) {
@@ -3179,6 +3376,13 @@ function cancelCreateAction() {
   hideCreateStatus();
   pendingCreateText = "";
   pendingCreateName = "";
+  pendingMatchCount = 0;
+  pendingMatchIndex = 0;
+  pendingMatchCase = true;
+  pendingMatchWholeWord = true;
+  matchNavInFlight = false;
+  chipNavGeneration++;
+  suppressSelectionPreview = false;
   const btn = document.getElementById("create-replace-btn");
   if (btn) {
     btn.innerHTML = "Convert to Placeholder";

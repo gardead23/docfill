@@ -1126,6 +1126,49 @@ textarea {
   background: #047857;
 }
 
+/* ── Match Navigation ── */
+.match-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.match-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.match-nav-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.match-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.match-nav-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  min-width: 50px;
+  text-align: center;
+}
+
 /* ── Create Status ── */
 #create-status {
   font-size: 12px;
