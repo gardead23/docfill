@@ -211,6 +211,119 @@
       line-height: 1.6;
     }
 
+    /* ── Notice callout ── */
+    .notice {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      border-radius: 0 8px 8px 0;
+      padding: 18px 20px;
+      margin-top: 24px;
+    }
+    .notice-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .notice-header svg {
+      width: 18px;
+      height: 18px;
+      color: #d97706;
+      flex-shrink: 0;
+    }
+    .notice-header span {
+      font-size: 13px;
+      font-weight: 700;
+      color: #92400e;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .notice p {
+      font-size: 13px;
+      color: #92400e;
+      margin-bottom: 6px;
+      line-height: 1.6;
+    }
+    .notice p:last-child { margin-bottom: 0; }
+    .notice ul {
+      margin: 4px 0 0 20px;
+      list-style: disc;
+      font-size: 13px;
+      color: #92400e;
+      line-height: 1.6;
+    }
+    .notice li { margin-bottom: 4px; }
+
+    /* ── Contact form ── */
+    .contact-form {
+      margin-top: 8px;
+    }
+    .form-row {
+      margin-bottom: 16px;
+    }
+    .form-row label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    .form-row select,
+    .form-row input,
+    .form-row textarea {
+      width: 100%;
+      font-family: inherit;
+      font-size: 14px;
+      color: #111827;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: border-color 0.15s ease;
+    }
+    .form-row select:focus,
+    .form-row input:focus,
+    .form-row textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+    .form-row textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    .form-row select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+    .form-submit {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #2563eb;
+      color: white;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 24px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .form-submit:hover {
+      background: #1d4ed8;
+    }
+    .form-note {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 12px;
+    }
+
     /* ── Contact card ── */
     .contact-card {
       background: #f0f9ff;
@@ -298,6 +411,15 @@
         <div class="help-section">
           <h3>Step 4: Fill the Document</h3>
           <p>Click <strong>Fill Document</strong> to replace all placeholders with your values. Empty fields are highlighted so you can complete them later.</p>
+        </div>
+
+        <div class="notice">
+          <div class="notice-header">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Good to know</span>
+          </div>
+          <p>DocFill works in the document body, headers, and footers. However, placeholders inside <strong>text boxes</strong>, <strong>watermarks</strong>, or <strong>floating shapes</strong> cannot be detected or filled. This is a limitation of the Word add-in platform, not a bug.</p>
+          <p>For best results, keep your placeholder text in the main document flow.</p>
         </div>
       </div>
 
@@ -400,7 +522,7 @@
         <details>
           <summary>Does DocFill work in headers and footers?</summary>
           <div class="accordion-body">
-            <p>Yes. DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported.</p>
+            <p>Yes. DocFill scans and fills placeholders in the document body, headers, and footers.</p>
           </div>
         </details>
 
@@ -459,9 +581,42 @@
           </div>
           <h2>Contact Us</h2>
         </div>
-        <p>Need help with something not covered above? Reach out to us:</p>
-        <p><strong>Email:</strong> <a href="mailto:support@smplhq.com">support@smplhq.com</a></p>
-        <p>We aim to respond within 1-2 business days.</p>
+        <p>Need help with something not covered here? Tell us what's going on and we'll get back to you within 1-2 business days.</p>
+
+        <form class="contact-form" action="mailto:support@smplhq.com" method="POST" enctype="text/plain" id="support-form">
+          <div class="form-row">
+            <label for="contact-email">Your email</label>
+            <input type="email" id="contact-email" name="email" placeholder="you@example.com" required/>
+          </div>
+          <div class="form-row">
+            <label for="contact-os">Operating system</label>
+            <select id="contact-os" name="os" required>
+              <option value="" disabled selected>Select your OS</option>
+              <option value="Mac">Mac</option>
+              <option value="Windows">Windows</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="contact-word">Word version</label>
+            <select id="contact-word" name="word_version" required>
+              <option value="" disabled selected>Select your Word version</option>
+              <option value="Word for the web">Word for the web</option>
+              <option value="Word Desktop (Microsoft 365)">Word Desktop (Microsoft 365)</option>
+              <option value="Word Desktop (standalone)">Word Desktop (standalone)</option>
+              <option value="Not sure">Not sure</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="contact-issue">What's happening?</label>
+            <textarea id="contact-issue" name="issue" placeholder="Describe what you were doing, what you expected to happen, and what happened instead." required></textarea>
+          </div>
+          <button type="submit" class="form-submit">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Send Message
+          </button>
+          <p class="form-note">This opens your email client with the details pre-filled. We'll reply to the email address you provide.</p>
+        </form>
       </div>
 
     </main>
