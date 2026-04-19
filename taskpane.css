@@ -1384,3 +1384,197 @@ textarea {
   border-color: #d1d5db;
   background: #f9fafb;
 }
+
+/* ── Row Picker (Horizontal Import) ── */
+.import-row-picker-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.import-row-picker-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 250px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.import-row-picker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.import-row-picker-table th {
+  position: sticky;
+  top: 0;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  z-index: 2;
+}
+
+.import-row-picker-table td {
+  padding: 6px 10px;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-row-picker-table .row-radio-col {
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  width: 28px;
+  padding: 6px 6px;
+  text-align: center;
+  z-index: 1;
+}
+
+.import-row-picker-table th.row-radio-col {
+  background: #f3f4f6;
+  z-index: 3;
+}
+
+.import-row-picker-table tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.import-row-picker-table tr:hover {
+  background: #f9fafb;
+}
+
+.import-row-picker-table tr.selected {
+  background: #eff6ff;
+}
+
+.import-row-picker-table tr.selected .row-radio-col {
+  background: #eff6ff;
+}
+
+.import-row-picker-table tr:hover .row-radio-col {
+  background: #f9fafb;
+}
+
+.import-row-picker-table tr.selected:hover .row-radio-col {
+  background: #eff6ff;
+}
+
+.import-row-picker-table tr.selected td {
+  color: #1d4ed8;
+}
+
+.import-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.import-page-btn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: #2563eb;
+  background: none;
+  border: 1px solid #bfdbfe;
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.import-page-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.import-page-btn:disabled {
+  color: #d1d5db;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.import-page-label {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.import-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 0;
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #2563eb;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.import-select-btn:hover {
+  background: #1d4ed8;
+}
+
+.import-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 7px 0;
+  margin-top: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.import-back-btn:hover {
+  color: #374151;
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.import-twocol-link {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.15s;
+  background: none;
+  border: none;
+  font-family: inherit;
+  width: 100%;
+  padding: 0;
+}
+
+.import-twocol-link:hover {
+  color: #1d4ed8;
+}

@@ -19,10 +19,16 @@ import {
   normalizeImportKey,
   isHeaderRow,
   detectDelimiter,
+  parseCSVRaw,
+  parsePastedRaw,
   parseCSV,
   parsePastedText,
   parseDateValue,
   matchImportKeys,
+  isHorizontalHeaderRow,
+  detectImportFormat,
+  extractHorizontalData,
+  horizontalRowToVertical,
 } from "../lib/pure.mjs";
 
 // ── toTitleCase ──────────────────────────────────────────────────────────────
@@ -766,5 +772,224 @@ describe("matchImportKeys", () => {
     const rows = [{ key: "constructor", value: "Acme" }];
     const result = matchImportKeys(rows, fieldsWithConstructor);
     expect(result.matched).toEqual([{ fieldKey: "constructor", value: "Acme" }]);
+  });
+});
+
+// ── Raw Parsers ─────────────────────────────────────────────────────────────
+
+describe("parseCSVRaw", () => {
+  it("returns 2D array from multi-column CSV", () => {
+    const result = parseCSVRaw("a,b,c\n1,2,3");
+    expect(result).toEqual([["a", "b", "c"], ["1", "2", "3"]]);
+  });
+
+  it("handles quoted fields", () => {
+    const result = parseCSVRaw('name,"Smith, John",age');
+    expect(result).toEqual([["name", "Smith, John", "age"]]);
+  });
+
+  it("handles empty input", () => {
+    expect(parseCSVRaw("")).toEqual([]);
+    expect(parseCSVRaw("  ")).toEqual([]);
+  });
+
+  it("handles Windows line endings", () => {
+    const result = parseCSVRaw("a,b\r\nc,d\r\n");
+    expect(result).toEqual([["a", "b"], ["c", "d"]]);
+  });
+
+  it("filters completely empty middle rows", () => {
+    const result = parseCSVRaw("a,b\n\nc,d");
+    expect(result).toEqual([["a", "b"], ["c", "d"]]);
+  });
+});
+
+describe("parsePastedRaw", () => {
+  it("returns 2D array and detected delimiter", () => {
+    const result = parsePastedRaw("a\tb\tc\n1\t2\t3");
+    expect(result.rows).toEqual([["a", "b", "c"], ["1", "2", "3"]]);
+    expect(result.delimiter).toBe("\t");
+  });
+
+  it("detects comma delimiter", () => {
+    const result = parsePastedRaw("a,b,c\n1,2,3");
+    expect(result.delimiter).toBe(",");
+  });
+
+  it("filters empty lines", () => {
+    const result = parsePastedRaw("a\tb\n\nc\td\n");
+    expect(result.rows).toEqual([["a", "b"], ["c", "d"]]);
+  });
+
+  it("handles empty input", () => {
+    const result = parsePastedRaw("");
+    expect(result.rows).toEqual([]);
+  });
+});
+
+// ── Horizontal Import Helpers ───────────────────────────────────────────────
+
+describe("isHorizontalHeaderRow", () => {
+  it("returns true for text labels with 3+ columns", () => {
+    expect(isHorizontalHeaderRow(["Effective Date", "Company Name", "Client Name"])).toBe(true);
+  });
+
+  it("returns true for simple labels", () => {
+    expect(isHorizontalHeaderRow(["Name", "Email", "Phone"])).toBe(true);
+  });
+
+  it("returns false when first cell has no letters", () => {
+    expect(isHorizontalHeaderRow(["3/21/26", "Acme", "Danny"])).toBe(false);
+  });
+
+  it("returns false for all numeric cells", () => {
+    expect(isHorizontalHeaderRow(["100", "200", "300"])).toBe(false);
+  });
+
+  it("returns false for currency values", () => {
+    expect(isHorizontalHeaderRow(["$100", "200", "300"])).toBe(false);
+  });
+
+  it("returns false for only 2 non-empty cells", () => {
+    expect(isHorizontalHeaderRow(["Name", "Value"])).toBe(false);
+  });
+
+  it("returns false for fewer than 3 non-empty cells", () => {
+    expect(isHorizontalHeaderRow(["Name", "", ""])).toBe(false);
+  });
+
+  it("returns true when all cells have letters (acceptable edge case)", () => {
+    expect(isHorizontalHeaderRow(["123 Main St", "Apt 4", "Springfield"])).toBe(true);
+  });
+});
+
+describe("detectImportFormat", () => {
+  it("returns horizontal for 3+ columns with header + data", () => {
+    const rows = [["Name", "Email", "Phone"], ["Danny", "d@x", "555"]];
+    expect(detectImportFormat(rows)).toBe("horizontal");
+  });
+
+  it("returns vertical for 2 columns (always)", () => {
+    const rows = [["Name", "Value"], ["client_name", "Acme"]];
+    expect(detectImportFormat(rows)).toBe("vertical");
+  });
+
+  it("returns vertical for data-like first row", () => {
+    const rows = [["3/21/26", "Acme", "Danny"], ["3/22/26", "Apple", "Elmo"]];
+    expect(detectImportFormat(rows)).toBe("vertical");
+  });
+
+  it("returns vertical for header-only (no data rows)", () => {
+    const rows = [["Name", "Email", "Phone"]];
+    expect(detectImportFormat(rows)).toBe("vertical");
+  });
+
+  it("returns horizontal with leading blank rows filtered", () => {
+    const rows = [["", ""], ["Name", "Email", "Phone"], ["Danny", "d@x", "555"]];
+    expect(detectImportFormat(rows)).toBe("horizontal");
+  });
+
+  it("returns vertical for empty input", () => {
+    expect(detectImportFormat([])).toBe("vertical");
+  });
+
+  it("returns vertical when data rows differ from header width", () => {
+    // 3-col header + 2-col data rows -> vertical (not a real spreadsheet)
+    const rows = [["Name", "Email", "Phone"], ["Danny", "d@x"], ["Elmo", "e@x"]];
+    expect(detectImportFormat(rows)).toBe("vertical");
+  });
+
+  it("returns vertical when data rows have inconsistent column counts", () => {
+    const rows = [["Name", "Email", "Phone"], ["Danny", "d@x", "555"], ["Elmo", "e@x"]];
+    expect(detectImportFormat(rows)).toBe("vertical");
+  });
+
+  it("returns horizontal when all rows have consistent width", () => {
+    const rows = [
+      ["Name", "Email", "Phone"],
+      ["Danny", "d@x", "555"],
+      ["Elmo", "e@x", "556"],
+    ];
+    expect(detectImportFormat(rows)).toBe("horizontal");
+  });
+});
+
+describe("extractHorizontalData", () => {
+  it("extracts headers and data rows", () => {
+    const rows = [["Name", "Email"], ["Danny", "d@x"], ["Elmo", "e@x"]];
+    const result = extractHorizontalData(rows);
+    expect(result.headers).toEqual(["Name", "Email"]);
+    expect(result.dataRows).toEqual([["Danny", "d@x"], ["Elmo", "e@x"]]);
+  });
+
+  it("filters leading blank rows", () => {
+    const rows = [["", ""], ["Name", "Email"], ["Danny", "d@x"]];
+    const result = extractHorizontalData(rows);
+    expect(result.headers).toEqual(["Name", "Email"]);
+    expect(result.dataRows).toEqual([["Danny", "d@x"]]);
+  });
+
+  it("returns empty for empty input", () => {
+    const result = extractHorizontalData([]);
+    expect(result.headers).toEqual([]);
+    expect(result.dataRows).toEqual([]);
+  });
+
+  it("returns empty dataRows for header-only input", () => {
+    const result = extractHorizontalData([["Name", "Email"]]);
+    expect(result.dataRows).toEqual([]);
+  });
+});
+
+describe("horizontalRowToVertical", () => {
+  it("pairs headers with values", () => {
+    const result = horizontalRowToVertical(["Name", "Email"], ["Danny", "d@x"]);
+    expect(result.rows).toEqual([
+      { key: "Name", value: "Danny" },
+      { key: "Email", value: "d@x" },
+    ]);
+    expect(result.skippedEmpty).toBe(0);
+  });
+
+  it("trims keys and values", () => {
+    const result = horizontalRowToVertical(["  Name  ", "  Email  "], ["  Danny  ", "  d@x  "]);
+    expect(result.rows).toEqual([
+      { key: "Name", value: "Danny" },
+      { key: "Email", value: "d@x" },
+    ]);
+  });
+
+  it("skips empty keys", () => {
+    const result = horizontalRowToVertical(["Name", "", "Phone"], ["Danny", "skip", "555"]);
+    expect(result.rows).toEqual([
+      { key: "Name", value: "Danny" },
+      { key: "Phone", value: "555" },
+    ]);
+  });
+
+  it("counts empty values in skippedEmpty", () => {
+    const result = horizontalRowToVertical(["Name", "Email", "Phone"], ["Danny", "", ""]);
+    expect(result.rows).toEqual([{ key: "Name", value: "Danny" }]);
+    expect(result.skippedEmpty).toBe(2);
+  });
+
+  it("handles row shorter than headers", () => {
+    const result = horizontalRowToVertical(["Name", "Email", "Phone"], ["Danny"]);
+    expect(result.rows).toEqual([{ key: "Name", value: "Danny" }]);
+    expect(result.skippedEmpty).toBe(2);
+  });
+
+  it("ignores extra values beyond headers", () => {
+    const result = horizontalRowToVertical(["Name"], ["Danny", "extra1", "extra2"]);
+    expect(result.rows).toEqual([{ key: "Name", value: "Danny" }]);
+  });
+});
+
+// ── Regression: vertical paste with extra delimiters ────────────────────────
+
+describe("parsePastedText regression", () => {
+  it("rejoins extra delimiters into value for vertical format", () => {
+    const result = parsePastedText("address\t123 Main St\tApt 4");
+    expect(result.rows).toEqual([{ key: "address", value: "123 Main St\tApt 4" }]);
   });
 });

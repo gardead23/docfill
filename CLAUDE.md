@@ -350,7 +350,11 @@ Panel auto-closes after 3s only if completely clean (no warnings/errors). "Impor
 
 **No XLSX:** Deferred to avoid third-party runtime dependency (SheetJS). CSV + paste covers the core workflow since users can export or copy from Excel.
 
-**Pure functions:** `normalizeImportKey`, `isHeaderRow`, `detectDelimiter`, `parseCSV`, `parsePastedText`, `parseDateValue`, `matchImportKeys` -- all in both `lib/pure.mjs` (tested) and `taskpane.js` (inline duplicate).
+**Horizontal (multi-column) import:** When imported data has 3+ columns and the first row looks like headers (all cells contain letters, consistent column width across data rows, at least 1 data row), the import auto-detects horizontal format and shows a **row picker** -- a scrollable table with radio buttons where the user selects which row to import. The selected row's values are paired with column headers and converted to vertical `{key, value}` pairs, then flow through the existing `matchImportKeys -> setFieldValue -> showImportSummary` pipeline. 2-column data is always treated as vertical (no ambiguity). An "Use as two-column format" escape hatch on the row picker bypasses horizontal detection for edge cases.
+
+**Row picker rendering:** Uses DOM APIs (`createElement`, `textContent`, `title` property) instead of innerHTML for safe handling of untrusted spreadsheet data. Rows are clickable (full `<tr>` click target). Capped at 100 displayed rows.
+
+**Pure functions:** `normalizeImportKey`, `isHeaderRow`, `detectDelimiter`, `parseCSVRaw`, `parsePastedRaw`, `parseCSV`, `parsePastedText`, `parseDateValue`, `matchImportKeys`, `isHorizontalHeaderRow`, `detectImportFormat`, `extractHorizontalData`, `horizontalRowToVertical` -- all in both `lib/pure.mjs` (tested) and `taskpane.js` (inline duplicate).
 
 ## Testing
 
@@ -361,7 +365,7 @@ npm test           # run once
 npm run test:watch # watch mode
 ```
 
-135 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`, `isDocFillCC`, `ccTagToKey`, `keyToCCTag`, `placeholderText`, `isPlaceholderText`, `isPlaceholderTextForKey`, `isCCUnfilled`, `normalizeImportKey`, `isHeaderRow`, `detectDelimiter`, `parseCSV`, `parsePastedText`, `parseDateValue`, `matchImportKeys`.
+172 tests covering: `toTitleCase`, `escapeHtml`, `escapeAttr`, `guessFieldType`, `suggestPlaceholderName`, `daysInMonth`, `formatDate`, `buildStorageKey`, `isDocFillCC`, `ccTagToKey`, `keyToCCTag`, `placeholderText`, `isPlaceholderText`, `isPlaceholderTextForKey`, `isCCUnfilled`, `normalizeImportKey`, `isHeaderRow`, `detectDelimiter`, `parseCSVRaw`, `parsePastedRaw`, `parseCSV`, `parsePastedText`, `parseDateValue`, `matchImportKeys`, `isHorizontalHeaderRow`, `detectImportFormat`, `extractHorizontalData`, `horizontalRowToVertical`.
 
 CI runs on every push/PR to `main` via GitHub Actions (`.github/workflows/ci.yml`): syntax check, manifest validation, and test suite.
 

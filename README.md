@@ -116,7 +116,7 @@ docfill/
 +-- lib/
 |   +-- pure.mjs           <- pure helper functions (extracted for testability)
 +-- tests/
-|   +-- pure.test.js       <- Vitest unit tests (135 tests)
+|   +-- pure.test.js       <- Vitest unit tests (172 tests)
 +-- commands.html          <- required Office command surface shell
 +-- privacy.html           <- privacy policy (required for AppSource)
 +-- support.html           <- support/help page (required for AppSource)
@@ -169,7 +169,7 @@ npm run test:watch # watch mode
 - **Labels are saved** per template -- your customizations persist across sessions
 - **Headers and footers supported:** DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported
 - **Multi-line text:** Long text fields support multiple lines. Line breaks are preserved inside the document using soft line breaks (same paragraph formatting is maintained)
-- **Import data:** Click the import button (down-arrow icon) in the Fill toolbar to populate fields from a CSV file or by pasting two-column data (field name + value). DocFill matches keys case-insensitively and handles spaces, underscores, hyphens, and `{{braces}}` interchangeably. A summary shows exactly what was filled, what wasn't recognized, and any date parsing issues. Fields are populated in the form for review before you click Fill Document.
+- **Import data:** Click the Import button in the Fill toolbar to populate fields from a CSV file or by pasting data. Supports two formats: two-column (field name + value, one per row) and multi-column spreadsheets (column headers = field names, pick a row). DocFill auto-detects the format and shows a row picker for multi-column data. Keys are matched case-insensitively with space, underscore, hyphen, and `{{brace}}` normalization. A summary shows what was filled, unrecognized keys, and date parsing issues.
 
 ---
 

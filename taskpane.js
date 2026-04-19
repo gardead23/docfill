@@ -1321,9 +1321,14 @@ function doFormClear() {
 // Populates the form only -- user still clicks "Fill Document" to apply.
 
 const IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const IMPORT_ROW_CAP = 100;
 let importAutoCloseTimer = null;
 let importGeneration = 0;
 let activeImportReader = null;
+let pendingHorizontalHeaders = null;
+let pendingHorizontalRows = null;
+let pendingImportRawText = null;
+let pendingImportSource = null; // "csv" | "paste"
 
 const MONTH_NAMES = [
   "january", "february", "march", "april", "may", "june",
@@ -1351,8 +1356,8 @@ function detectDelimiter(line) {
   return tabs >= commas && tabs > 0 ? "\t" : ",";
 }
 
-function parseCSV(text) {
-  if (!text || !text.trim()) return { rows: [], skippedEmpty: 0 };
+function parseCSVRaw(text) {
+  if (!text || !text.trim()) return [];
 
   const allRows = [];
   let currentCell = "";
@@ -1394,6 +1399,24 @@ function parseCSV(text) {
     allRows.push(currentRow);
   }
 
+  return allRows.filter((row) => row.some((c) => c !== ""));
+}
+
+function parsePastedRaw(text) {
+  if (!text || !text.trim()) return { rows: [], delimiter: "," };
+
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  const nonEmpty = lines.filter((l) => l.trim());
+  if (nonEmpty.length === 0) return { rows: [], delimiter: "," };
+
+  const delimiter = detectDelimiter(nonEmpty[0]);
+  const rows = nonEmpty.map((line) => line.split(delimiter));
+
+  return { rows, delimiter };
+}
+
+function parseCSV(text) {
+  const allRows = parseCSVRaw(text);
   const rows = [];
   let skippedEmpty = 0;
   let isFirst = true;
@@ -1421,24 +1444,17 @@ function parseCSV(text) {
 }
 
 function parsePastedText(text) {
-  if (!text || !text.trim()) return { rows: [], skippedEmpty: 0 };
-
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const nonEmpty = lines.filter((l) => l.trim());
-  if (nonEmpty.length === 0) return { rows: [], skippedEmpty: 0 };
-
-  const delimiter = detectDelimiter(nonEmpty[0]);
+  const raw = parsePastedRaw(text);
+  if (raw.rows.length === 0) return { rows: [], skippedEmpty: 0 };
 
   const rows = [];
   let skippedEmpty = 0;
   let isFirst = true;
 
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const parts = line.split(delimiter);
+  for (const parts of raw.rows) {
     if (parts.length < 2) continue;
     const key = parts[0].trim();
-    const value = parts.slice(1).join(delimiter).trim();
+    const value = parts.slice(1).join(raw.delimiter).trim();
     if (!key) continue;
 
     if (isFirst) {
@@ -1540,6 +1556,51 @@ function matchImportKeys(rows, fields) {
   return { matched, unmatched, duplicates };
 }
 
+// ── Horizontal Import Helpers ────────────────────────────────────────────────
+
+function isHorizontalHeaderRow(cells) {
+  if (!cells || cells.length < 3) return false;
+  const nonEmpty = cells.filter((c) => c.trim() !== "");
+  if (nonEmpty.length < 3) return false;
+  return nonEmpty.every((c) => /[a-zA-Z]/.test(c));
+}
+
+function detectImportFormat(allRows) {
+  const nonEmpty = allRows.filter((row) => row.some((c) => c.trim() !== ""));
+  if (nonEmpty.length < 2) return "vertical";
+
+  const headerRow = nonEmpty[0];
+  if (headerRow.length < 3) return "vertical";
+  if (!isHorizontalHeaderRow(headerRow)) return "vertical";
+
+  const expectedCols = headerRow.length;
+  const dataRows = nonEmpty.slice(1);
+  for (const row of dataRows) {
+    if (row.length !== expectedCols) return "vertical";
+  }
+
+  return "horizontal";
+}
+
+function extractHorizontalData(allRows) {
+  const nonEmpty = allRows.filter((row) => row.some((c) => c.trim() !== ""));
+  if (nonEmpty.length === 0) return { headers: [], dataRows: [] };
+  return { headers: nonEmpty[0], dataRows: nonEmpty.slice(1) };
+}
+
+function horizontalRowToVertical(headers, dataRow) {
+  const rows = [];
+  let skippedEmpty = 0;
+  for (let i = 0; i < headers.length; i++) {
+    const key = (headers[i] || "").trim();
+    const value = (dataRow[i] || "").trim();
+    if (!key) continue;
+    if (!value) { skippedEmpty++; continue; }
+    rows.push({ key, value });
+  }
+  return { rows, skippedEmpty };
+}
+
 // ── Import UI ──────────────────────────────────────────────────────────────────
 
 function toggleImportPanel() {
@@ -1564,6 +1625,10 @@ function closeImportPanel() {
     activeImportReader.abort();
   }
   activeImportReader = null;
+  pendingHorizontalHeaders = null;
+  pendingHorizontalRows = null;
+  pendingImportRawText = null;
+  pendingImportSource = null;
   const panel = document.getElementById("import-panel");
   const btn = document.getElementById("fill-import-btn");
   if (panel) {
@@ -1571,6 +1636,194 @@ function closeImportPanel() {
     panel.innerHTML = "";
   }
   btn?.classList.remove("active");
+}
+
+function renderRowPicker(headers, dataRows, page) {
+  if (typeof page !== "number") page = 0;
+  const totalPages = Math.ceil(dataRows.length / IMPORT_ROW_CAP);
+  const startIdx = page * IMPORT_ROW_CAP;
+  const pageRows = dataRows.slice(startIdx, startIdx + IMPORT_ROW_CAP);
+
+  const panel = document.getElementById("import-panel");
+  if (!panel) return;
+  panel.innerHTML = "";
+
+  // Close button
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "import-close-btn";
+  closeBtn.title = "Close";
+  closeBtn.onclick = closeImportPanel;
+  closeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  panel.appendChild(closeBtn);
+
+  // Label
+  const label = document.createElement("div");
+  label.className = "import-row-picker-label";
+  label.textContent = "Select a row to import";
+  panel.appendChild(label);
+
+  // Scrollable table container
+  const scroll = document.createElement("div");
+  scroll.className = "import-row-picker-scroll";
+
+  const table = document.createElement("table");
+  table.className = "import-row-picker-table";
+
+  // Header row
+  const thead = document.createElement("thead");
+  const headerTr = document.createElement("tr");
+  const radioTh = document.createElement("th");
+  radioTh.className = "row-radio-col";
+  headerTr.appendChild(radioTh);
+  for (const h of headers) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    th.title = h;
+    headerTr.appendChild(th);
+  }
+  thead.appendChild(headerTr);
+  table.appendChild(thead);
+
+  // Data rows for this page
+  const tbody = document.createElement("tbody");
+
+  for (let i = 0; i < pageRows.length; i++) {
+    const actualIdx = startIdx + i;
+    const tr = document.createElement("tr");
+    if (i === 0) tr.className = "selected";
+
+    // Radio cell
+    const radioTd = document.createElement("td");
+    radioTd.className = "row-radio-col";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "import-row";
+    radio.value = String(actualIdx);
+    radio.setAttribute("aria-label", `Row ${actualIdx + 1}: ${pageRows[i].slice(0, 3).map((c) => (c || "").trim()).filter(Boolean).join(", ")}`);
+    if (i === 0) radio.checked = true;
+    radio.onchange = function () {
+      table.querySelectorAll("tbody tr").forEach((r) => r.classList.remove("selected"));
+      tr.classList.add("selected");
+    };
+    radioTd.appendChild(radio);
+    tr.appendChild(radioTd);
+
+    // Data cells
+    for (let j = 0; j < headers.length; j++) {
+      const td = document.createElement("td");
+      const cellValue = (pageRows[i][j] || "").trim();
+      td.textContent = cellValue;
+      td.title = cellValue;
+      tr.appendChild(td);
+    }
+
+    // Clickable row
+    tr.onclick = function () {
+      table.querySelectorAll("tbody tr").forEach((r) => r.classList.remove("selected"));
+      tr.classList.add("selected");
+      radio.checked = true;
+    };
+
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  scroll.appendChild(table);
+  panel.appendChild(scroll);
+
+  // Pagination
+  if (totalPages > 1) {
+    const paginationWrap = document.createElement("div");
+    paginationWrap.className = "import-pagination";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.className = "import-page-btn";
+    prevBtn.textContent = "Previous";
+    prevBtn.disabled = page === 0;
+    prevBtn.onclick = function () { renderRowPicker(headers, dataRows, page - 1); };
+
+    const pageLabel = document.createElement("span");
+    pageLabel.className = "import-page-label";
+    pageLabel.textContent = `${startIdx + 1}\u2013${Math.min(startIdx + IMPORT_ROW_CAP, dataRows.length)} of ${dataRows.length}`;
+
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "import-page-btn";
+    nextBtn.textContent = "Next";
+    nextBtn.disabled = page >= totalPages - 1;
+    nextBtn.onclick = function () { renderRowPicker(headers, dataRows, page + 1); };
+
+    paginationWrap.appendChild(prevBtn);
+    paginationWrap.appendChild(pageLabel);
+    paginationWrap.appendChild(nextBtn);
+    panel.appendChild(paginationWrap);
+  }
+
+  // Import Row button
+  const importBtn = document.createElement("button");
+  importBtn.className = "import-select-btn";
+  importBtn.textContent = "Import Row";
+  importBtn.onclick = onHorizontalRowSelected;
+  panel.appendChild(importBtn);
+
+  // Back button
+  const backBtn = document.createElement("button");
+  backBtn.className = "import-back-btn";
+  backBtn.textContent = "Back";
+  backBtn.onclick = function () {
+    pendingHorizontalHeaders = null;
+    pendingHorizontalRows = null;
+    pendingImportRawText = null;
+    pendingImportSource = null;
+    renderImportPanel();
+  };
+  panel.appendChild(backBtn);
+
+  // Escape hatch
+  const twoColLink = document.createElement("button");
+  twoColLink.className = "import-twocol-link";
+  twoColLink.textContent = "Import as Field Name and Value pairs instead";
+  twoColLink.onclick = onUseAsTwoColumnFormat;
+  panel.appendChild(twoColLink);
+
+}
+
+function onHorizontalRowSelected() {
+  if (hfScanInProgress || scanInProgress || fillInProgress) {
+    showImportSummary({ error: "Still finishing document setup. Please wait a moment." });
+    return;
+  }
+  if (!pendingHorizontalHeaders || !pendingHorizontalRows) return;
+
+  const selected = document.querySelector('input[name="import-row"]:checked');
+  if (!selected) return;
+
+  const idx = parseInt(selected.value, 10);
+  const dataRow = pendingHorizontalRows[idx];
+  if (!dataRow) return;
+
+  const result = horizontalRowToVertical(pendingHorizontalHeaders, dataRow);
+  pendingHorizontalHeaders = null;
+  pendingHorizontalRows = null;
+  pendingImportRawText = null;
+  pendingImportSource = null;
+  applyImportData(result, "horizontal");
+}
+
+function onUseAsTwoColumnFormat() {
+  if (hfScanInProgress || scanInProgress || fillInProgress) {
+    showImportSummary({ error: "Still finishing document setup. Please wait a moment." });
+    return;
+  }
+  if (!pendingImportRawText || !pendingImportSource) return;
+
+  const text = pendingImportRawText;
+  const source = pendingImportSource;
+  pendingHorizontalHeaders = null;
+  pendingHorizontalRows = null;
+  pendingImportRawText = null;
+  pendingImportSource = null;
+
+  const parseResult = source === "csv" ? parseCSV(text) : parsePastedText(text);
+  applyImportData(parseResult);
 }
 
 function renderImportPanel() {
@@ -1592,8 +1845,8 @@ function renderImportPanel() {
     <input class="import-file-input" type="file" id="import-file-input" accept=".csv" onchange="onImportFileSelected(event)" />
     <div class="import-divider">or</div>
     <label class="import-section-label" for="import-paste-area">Paste your data</label>
-    <textarea class="import-paste-area" id="import-paste-area" placeholder="Paste two columns here (field name and value)..."></textarea>
-    <div class="import-paste-hint">Tab-separated or comma-separated</div>
+    <textarea class="import-paste-area" id="import-paste-area" placeholder="Paste your data here..."></textarea>
+    <div class="import-paste-hint">Two columns or a full spreadsheet</div>
     <button class="import-paste-btn" onclick="onPasteImport()">Import pasted data</button>
   `;
 }
@@ -1639,8 +1892,18 @@ function onImportFileSelected(event) {
       showImportSummary({ error: "Could not read the file. Please try again." });
       return;
     }
-    const parseResult = parseCSV(text);
-    applyImportData(parseResult);
+    const allRows = parseCSVRaw(text);
+    if (detectImportFormat(allRows) === "horizontal") {
+      const hData = extractHorizontalData(allRows);
+      pendingHorizontalHeaders = hData.headers;
+      pendingHorizontalRows = hData.dataRows;
+      pendingImportRawText = text;
+      pendingImportSource = "csv";
+      renderRowPicker(hData.headers, hData.dataRows);
+    } else {
+      const parseResult = parseCSV(text);
+      applyImportData(parseResult);
+    }
   };
   reader.onerror = function () {
     activeImportReader = null;
@@ -1668,8 +1931,18 @@ function onPasteImport() {
     showImportSummary({ error: "Paste some data first, then click Import." });
     return;
   }
-  const parseResult = parsePastedText(text);
-  applyImportData(parseResult);
+  const raw = parsePastedRaw(text);
+  if (detectImportFormat(raw.rows) === "horizontal") {
+    const hData = extractHorizontalData(raw.rows);
+    pendingHorizontalHeaders = hData.headers;
+    pendingHorizontalRows = hData.dataRows;
+    pendingImportRawText = text;
+    pendingImportSource = "paste";
+    renderRowPicker(hData.headers, hData.dataRows);
+  } else {
+    const parseResult = parsePastedText(text);
+    applyImportData(parseResult);
+  }
 }
 
 /**
@@ -1726,25 +1999,28 @@ function setFieldValue(fieldKey, value) {
   return true;
 }
 
-function applyImportData(parseResult) {
+function applyImportData(parseResult, sourceFormat) {
   const { rows, skippedEmpty } = parseResult;
 
   if (rows.length === 0) {
+    const sf = sourceFormat || "vertical";
     const msg = skippedEmpty > 0
-      ? "All rows had empty values. No data to import."
-      : "No data found to import. Expected two columns: field name and value.";
-    showImportSummary({ error: msg, skippedEmpty });
+      ? (sf === "horizontal" ? "All cells were empty. No data to import." : "All rows had empty values. No data to import.")
+      : "We couldn't read this data. Try a different format or check your file.";
+    showImportSummary({ error: msg, skippedEmpty, sourceFormat: sf });
     return;
   }
 
   const result = matchImportKeys(rows, currentFields);
 
   if (result.matched.length === 0) {
-    const keys = result.unmatched.slice(0, 5).map((r) => r.key).join(", ");
-    const more = result.unmatched.length > 5 ? `, and ${result.unmatched.length - 5} more` : "";
     showImportSummary({
-      error: `No matching fields found. Imported keys: ${keys}${more}`,
+      filledCount: 0,
+      unmatched: result.unmatched,
       skippedEmpty,
+      sourceFormat: sourceFormat || "vertical",
+      invalidDates: [],
+      duplicates: result.duplicates,
     });
     return;
   }
@@ -1766,6 +2042,7 @@ function applyImportData(parseResult) {
     filledCount,
     unmatched: result.unmatched,
     skippedEmpty,
+    sourceFormat: sourceFormat || "vertical",
     invalidDates,
     duplicates: result.duplicates,
   });
@@ -1783,15 +2060,22 @@ function showImportSummary(data) {
   if (data.error) {
     html += `<div class="import-summary-bucket import-summary-error-bucket">${escapeHtml(data.error)}</div>`;
     if (data.skippedEmpty && data.skippedEmpty > 0) {
-      const noun = data.skippedEmpty === 1 ? "row" : "rows";
-      html += `<div class="import-summary-bucket import-summary-warning-bucket">${data.skippedEmpty} ${noun} with empty values skipped</div>`;
+      const isHoriz = data.sourceFormat === "horizontal";
+      const noun = isHoriz
+        ? (data.skippedEmpty === 1 ? "empty cell" : "empty cells")
+        : (data.skippedEmpty === 1 ? "row with empty value" : "rows with empty values");
+      html += `<div class="import-summary-bucket import-summary-warning-bucket">${data.skippedEmpty} ${noun} skipped</div>`;
     }
+  } else if (!data.filledCount || data.filledCount === 0) {
+    // Nothing successfully filled -- single clean message instead of a wall of errors
+    const hint = data.sourceFormat === "horizontal"
+      ? 'If you pasted a simple list, try importing again and clicking "Import as Field Name and Value pairs instead".'
+      : "Please check your spelling or formatting and try again.";
+    html += `<div class="import-summary-bucket import-summary-error-bucket">None of this data matched your document fields. ${hint}</div>`;
   } else {
     // Filled bucket
-    if (data.filledCount > 0) {
-      const noun = data.filledCount === 1 ? "field" : "fields";
-      html += `<div class="import-summary-bucket import-summary-filled-bucket">${data.filledCount} ${noun} filled</div>`;
-    }
+    const noun = data.filledCount === 1 ? "field" : "fields";
+    html += `<div class="import-summary-bucket import-summary-filled-bucket">${data.filledCount} ${noun} filled</div>`;
 
     // Unrecognized bucket (bulleted if multiple)
     if (data.unmatched && data.unmatched.length > 0) {
@@ -1825,8 +2109,11 @@ function showImportSummary(data) {
 
     // Skipped empty bucket
     if (data.skippedEmpty && data.skippedEmpty > 0) {
-      const noun = data.skippedEmpty === 1 ? "row" : "rows";
-      html += `<div class="import-summary-bucket import-summary-warning-bucket">${data.skippedEmpty} ${noun} with empty values skipped</div>`;
+      const isHoriz = data.sourceFormat === "horizontal";
+      const noun = isHoriz
+        ? (data.skippedEmpty === 1 ? "empty cell" : "empty cells")
+        : (data.skippedEmpty === 1 ? "row with empty value" : "rows with empty values");
+      html += `<div class="import-summary-bucket import-summary-warning-bucket">${data.skippedEmpty} ${noun} skipped</div>`;
     }
 
     // Duplicates bucket (bulleted if multiple)
