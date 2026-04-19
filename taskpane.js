@@ -2614,7 +2614,14 @@ async function createPlaceholder() {
 
       const variantCount = allCount - exactCount;
 
-      if (allCount === 0) { shouldProceed = false; return; }
+      if (allCount === 0) {
+        shouldProceed = false;
+        // Distinguish "inside CC" from "not found at all"
+        if (allDeduped.length > 0) {
+          showCreateStatus("This text is already inside a placeholder field.", "info");
+        }
+        return;
+      }
 
       // Check for existing CCs for this key
       const existingCCs = context.document.contentControls.getByTag(keyToCCTag(name));
@@ -2640,7 +2647,7 @@ async function createPlaceholder() {
       }
     });
 
-    if (!shouldProceed && allCount === 0) {
+    if (!shouldProceed && allCount === 0 && !document.querySelector("#create-status.info")) {
       showCreateStatus("Could not find that text in the document -- try selecting it again.", "error");
     } else if (shouldProceed) {
       onPlaceholderCreated(name, 1);
