@@ -55,7 +55,14 @@
       color: #374151;
       margin-bottom: 6px;
     }
-    .help-section p { color: #4b5563; font-size: 14px; }
+    .help-section p, .help-section ul { color: #4b5563; font-size: 14px; }
+    .help-section ul {
+      margin: 8px 0 0 20px;
+      list-style: disc;
+    }
+    .help-section li {
+      margin-bottom: 4px;
+    }
     .contact-card {
       background: #f0f9ff;
       border: 1px solid #bae6fd;
@@ -71,43 +78,180 @@
       border-radius: 4px;
       font-size: 13px;
     }
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .step p { margin-bottom: 0; }
+    .tip {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #92400e;
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>DocFill - Support</h1>
-    <p>Get help with DocFill</p>
+    <p>Help center for DocFill, the Word template filler</p>
   </header>
   <main>
+
     <div class="card">
-      <h2>Quick Start</h2>
+      <h2>Getting Started</h2>
+
       <div class="help-section">
-        <h3>Creating a Template</h3>
-        <p>Select text in your Word document, switch to the <strong>Create</strong> tab, and click "Convert to Placeholder" to turn it into a <code>{{placeholder}}</code> field. Do this for each field you want to make fillable.</p>
+        <h3>Step 1: Add Placeholders to Your Document</h3>
+        <p>Type placeholders anywhere in your Word document using double curly braces:</p>
+        <p><code>{{client_name}}</code> <code>{{start_date}}</code> <code>{{total_fee}}</code></p>
+        <p>Use letters, numbers, and underscores for placeholder names. Placeholders work in the document body, headers, and footers.</p>
       </div>
+
       <div class="help-section">
-        <h3>Filling a Template</h3>
-        <p>Open a document with <code>{{placeholder}}</code> markers, switch to the <strong>Fill</strong> tab, and click "Scan Document." Fill in the form and click "Fill Document" to replace all placeholders with your values.</p>
+        <h3>Step 2: Scan Your Document</h3>
+        <p>Open the DocFill task pane from the Home ribbon, go to the <strong>Fill</strong> tab, and click <strong>Scan Document</strong>. DocFill detects all placeholders and builds a form for you.</p>
       </div>
+
       <div class="help-section">
-        <h3>Resetting</h3>
-        <p>Click "Reset All Fields" to restore all filled values back to their <code>{{placeholder}}</code> markers. Any other edits you made to the document are preserved.</p>
+        <h3>Step 3: Fill In Your Values</h3>
+        <p>Type values into the form fields. DocFill supports three field types:</p>
+        <ul>
+          <li><strong>Text</strong> -- single-line input for names, numbers, short text</li>
+          <li><strong>Date</strong> -- month/day/year dropdowns with format options</li>
+          <li><strong>Long text</strong> -- multi-line textarea for descriptions, terms, addresses</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>Step 4: Fill the Document</h3>
+        <p>Click <strong>Fill Document</strong> to replace all placeholders with your values. Empty fields are highlighted so you can complete them later.</p>
       </div>
     </div>
 
     <div class="card">
+      <h2>Creating Templates</h2>
+      <div class="help-section">
+        <h3>Using the Create Tab</h3>
+        <p>Don't want to type <code>{{}}</code> brackets manually? Switch to the <strong>Create</strong> tab, select any text in your document, give it a name, and click <strong>Convert to Placeholder</strong>. DocFill wraps it in a placeholder field for you.</p>
+        <p>If the text appears multiple times, you can convert just one occurrence, all exact matches, or all matches including different capitalizations.</p>
+      </div>
+      <div class="help-section">
+        <h3>Navigating Placeholders</h3>
+        <p>Click any placeholder in the list to jump to it in the document. Click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're viewing (e.g., "2 of 3").</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Importing Data</h2>
+      <div class="help-section">
+        <h3>From a CSV File</h3>
+        <p>Click the <strong>Import</strong> button in the Fill tab and upload a <code>.csv</code> file. DocFill supports two formats:</p>
+        <ul>
+          <li><strong>Two-column</strong> -- each row is a field name and value (e.g., <code>client_name,Acme Corp</code>)</li>
+          <li><strong>Multi-column spreadsheet</strong> -- column headers are field names, each row is a record. DocFill shows a row picker so you choose which row to import.</li>
+        </ul>
+      </div>
+      <div class="help-section">
+        <h3>By Pasting</h3>
+        <p>Copy two columns from Excel or Google Sheets and paste directly into the import panel. Tab-separated and comma-separated formats are auto-detected.</p>
+      </div>
+      <div class="help-section">
+        <h3>Key Matching</h3>
+        <p>DocFill matches imported field names to your placeholders flexibly. All of these will match <code>{{client_name}}</code>:</p>
+        <ul>
+          <li><code>client_name</code></li>
+          <li><code>Client Name</code></li>
+          <li><code>CLIENT_NAME</code></li>
+          <li><code>client-name</code></li>
+          <li><code>{{client_name}}</code></li>
+        </ul>
+      </div>
+      <div class="tip">Tip: After importing, review the values in the form before clicking Fill Document. Import populates the form only -- it does not change your document until you click Fill.</div>
+    </div>
+
+    <div class="card">
       <h2>Common Questions</h2>
+
       <div class="help-section">
         <h3>My placeholders aren't being detected</h3>
         <p>Make sure placeholders use double curly braces: <code>{{name}}</code>. The text inside must be a single word or use underscores (e.g., <code>{{first_name}}</code>). Avoid spaces inside the braces.</p>
       </div>
+
       <div class="help-section">
         <h3>Can I re-fill without resetting?</h3>
-        <p>Yes. Just change the values in the form and click "Fill Document" again. DocFill will swap the old values back to placeholders and fill with the new values automatically.</p>
+        <p>Yes. Change the values in the form and click "Fill Document" again. DocFill updates the document with the new values automatically.</p>
       </div>
+
+      <div class="help-section">
+        <h3>Can I undo a fill?</h3>
+        <p>Yes, two ways:</p>
+        <ul>
+          <li><strong>Per-field undo</strong> -- click the reset icon inside any filled field to restore just that placeholder</li>
+          <li><strong>Full reset</strong> -- click "Reset All Fields" to restore every placeholder. Your other document edits are preserved.</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>What date formats are supported?</h3>
+        <p>DocFill supports five date output formats: Long (March 22, 2026), Abbreviated (Mar 22, 2026), US Short (03/22/2026), International (22/03/2026), and ISO (2026-03-22). Set a global default or override per field.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Does DocFill work in headers and footers?</h3>
+        <p>Yes. DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Can I rename a field label?</h3>
+        <p>Yes. Click the pencil icon next to any field label to edit its display name. This changes only the label shown in the form -- it does not change the placeholder text in your document.</p>
+      </div>
+
       <div class="help-section">
         <h3>Where is my data stored?</h3>
-        <p>Your field settings (labels, types, date formats) are saved in your browser's local storage. No document content or placeholder values are sent to our servers. See our <a href="https://docfill.smplhq.com/privacy.html">privacy policy</a> for details.</p>
+        <p>Your field settings (labels, types, date formats) are saved in your browser's local storage. No document content or placeholder values are ever sent to any server. Everything stays on your device. See our <a href="https://docfill.smplhq.com/privacy">privacy policy</a> for details.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Does DocFill work on Word for the web?</h3>
+        <p>Yes. DocFill works on Word for Mac, Word for Windows, and Word for the web.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Troubleshooting</h2>
+
+      <div class="help-section">
+        <h3>Fields not found after Ctrl+Z</h3>
+        <p>If you undo changes in Word, DocFill picks up the reverted state the next time you scan. Click <strong>Rescan</strong> to refresh the field list.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Scan is slow on large documents</h3>
+        <p>DocFill scans the document body first so you can start filling immediately. Headers and footers are scanned in the background. A status banner shows progress.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Import says "None of this data matched"</h3>
+        <p>Check that your imported field names match the placeholder names in your document. DocFill is flexible with formatting (spaces, hyphens, capitalization all work), but the base words must match. For example, <code>Client Name</code> matches <code>{{client_name}}</code>, but <code>Customer Name</code> does not.</p>
       </div>
     </div>
 
