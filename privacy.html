@@ -12,95 +12,369 @@
       color: #111827;
       background: #f3f4f6;
       -webkit-font-smoothing: antialiased;
-      line-height: 1.6;
+      line-height: 1.7;
     }
+
+    /* ── Hero header ── */
     header {
-      background: #0f172a;
-      padding: 24px 32px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+      padding: 80px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(59,130,246,0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 30%, rgba(99,102,241,0.10) 0%, transparent 50%);
+      pointer-events: none;
     }
     header h1 {
       color: white;
-      font-size: 20px;
-      font-weight: 600;
+      font-size: 32px;
+      font-weight: 700;
+      position: relative;
     }
     header p {
-      color: rgba(255,255,255,0.6);
-      font-size: 13px;
-      margin-top: 4px;
+      color: rgba(255,255,255,0.55);
+      font-size: 15px;
+      margin-top: 8px;
+      position: relative;
     }
-    main {
-      max-width: 680px;
-      margin: 32px auto;
+
+    /* ── Layout: sidebar + content ── */
+    .page-layout {
+      max-width: 960px;
+      margin: 40px auto;
       padding: 0 24px;
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
     }
-    h2 {
-      font-size: 16px;
+
+    /* ── Sticky sidebar TOC ── */
+    .sidebar {
+      position: sticky;
+      top: 32px;
+      width: 200px;
+      flex-shrink: 0;
+    }
+    .sidebar nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sidebar a {
+      display: block;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b7280;
+      text-decoration: none;
+      border-radius: 6px;
+      border-left: 2px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .sidebar a:hover {
+      color: #111827;
+      background: rgba(0,0,0,0.03);
+    }
+    .sidebar a.active {
+      color: #2563eb;
+      background: #eff6ff;
+      border-left-color: #2563eb;
       font-weight: 600;
-      color: #0f172a;
-      margin: 28px 0 8px;
     }
-    h2:first-child { margin-top: 0; }
-    p, ul { margin-bottom: 12px; }
-    ul { padding-left: 20px; }
-    li { margin-bottom: 4px; }
+
+    /* ── Main content ── */
+    .content {
+      flex: 1;
+      min-width: 0;
+    }
+
     .card {
       background: white;
-      border-radius: 10px;
-      padding: 28px 24px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border-radius: 12px;
+      padding: 36px 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+      margin-bottom: 20px;
     }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .section-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+    .section-icon.green  { background: #f0fdf4; color: #16a34a; }
+    .section-icon.blue   { background: #eff6ff; color: #2563eb; }
+    .section-icon.violet { background: #f5f3ff; color: #7c3aed; }
+    .section-icon.amber  { background: #fffbeb; color: #d97706; }
+    .section-icon.slate  { background: #f1f5f9; color: #475569; }
+    .section-icon.sky    { background: #f0f9ff; color: #0284c7; }
+    .section-icon.rose   { background: #fff1f2; color: #e11d48; }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    p { margin-bottom: 12px; color: #4b5563; font-size: 14px; line-height: 1.7; }
+    p:last-child { margin-bottom: 0; }
+    ul {
+      margin: 8px 0 12px 20px;
+      list-style: disc;
+      color: #4b5563;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    li { margin-bottom: 6px; }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Trust badge ── */
+    .trust-badge {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .trust-badge-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .trust-badge-header svg {
+      width: 22px;
+      height: 22px;
+      color: #16a34a;
+      flex-shrink: 0;
+    }
+    .trust-badge-header span {
+      font-size: 15px;
+      font-weight: 700;
+      color: #14532d;
+    }
+    .trust-badge p {
+      font-size: 14px;
+      color: #166534;
+      line-height: 1.7;
+      margin-bottom: 0;
+    }
+
+    /* ── Footer ── */
     .updated {
       text-align: center;
-      color: #6b7280;
+      color: #9ca3af;
       font-size: 12px;
-      margin-top: 24px;
-      padding-bottom: 32px;
+      margin-top: 8px;
+      padding-bottom: 40px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .page-layout {
+        flex-direction: column;
+        gap: 0;
+      }
+      .sidebar { display: none; }
+      header { padding: 56px 24px; }
+      header h1 { font-size: 26px; }
+      .card { padding: 28px 22px; }
+      .trust-badge { padding: 20px 22px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>DocFill - Privacy Policy</h1>
+    <h1>Privacy Policy</h1>
     <p>How DocFill handles your data</p>
   </header>
-  <main>
-    <div class="card">
-      <h2>Overview</h2>
-      <p>DocFill is a Microsoft Word add-in that helps you fill placeholder fields in document templates. Your privacy is important to us. This policy explains what data DocFill accesses and how it is handled.</p>
 
-      <h2>Data Processing</h2>
-      <p>DocFill processes your document content entirely within your browser. Specifically:</p>
-      <ul>
-        <li>DocFill scans your Word document for <code>{{placeholder}}</code> markers to build a fill form.</li>
-        <li>When you click "Fill Document," DocFill replaces placeholders with the values you entered.</li>
-        <li>Filled values are tracked using Word's built-in content controls so they can be reset back to placeholders if needed.</li>
-      </ul>
+  <div class="page-layout">
+    <!-- Sticky sidebar TOC -->
+    <aside class="sidebar">
+      <nav>
+        <a href="#tldr" class="active">Plain English Summary</a>
+        <a href="#data-processing">Data Processing</a>
+        <a href="#data-storage">Data Storage</a>
+        <a href="#data-collection">Data Collection</a>
+        <a href="#local-processing">Local Processing</a>
+        <a href="#third-parties">Third Parties</a>
+        <a href="#changes">Policy Changes</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </aside>
 
-      <h2>Data Storage</h2>
-      <p>DocFill stores your field configuration (labels, field types, date format preferences) in your browser's localStorage. This data:</p>
-      <ul>
-        <li>Never leaves your device</li>
-        <li>Is not sent to any server</li>
-        <li>Is not shared with any third party</li>
-        <li>Can be cleared at any time by clearing your browser data</li>
-      </ul>
+    <!-- Main content -->
+    <main class="content">
 
-      <h2>Data Collection</h2>
-      <p>DocFill does not collect, transmit, or store any personal information. We do not use analytics, tracking, cookies, or telemetry of any kind.</p>
+      <!-- Trust badge / TL;DR -->
+      <div class="trust-badge" id="tldr">
+        <div class="trust-badge-header">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+          <span>The Plain English Summary</span>
+        </div>
+        <p>DocFill operates entirely on your local device. We do not transmit, read, or store any of your private document content or placeholder data on our servers. Your documents never leave your computer.</p>
+      </div>
 
-      <h2>Document Content Stays Local</h2>
-      <p>Your document content is never transmitted to our servers. The add-in code is loaded from our hosting provider (Cloudflare Pages), and the Office.js library is loaded from Microsoft's CDN, but all document processing happens entirely within your browser. No document text, placeholder values, or filled content is ever sent anywhere.</p>
+      <!-- Data Processing -->
+      <div class="card" id="data-processing">
+        <div class="section-header">
+          <div class="section-icon blue">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <h2>Data Processing</h2>
+        </div>
+        <p>DocFill processes your document content entirely within your browser. Here is exactly what happens:</p>
+        <ul>
+          <li>DocFill scans your Word document for <code>{{placeholder}}</code> markers and builds a fill form</li>
+          <li>When you click "Fill Document," DocFill replaces placeholders with the values you entered</li>
+          <li>Filled values are tracked using Word's built-in content controls so they can be reset back to placeholders if needed</li>
+        </ul>
+        <p>None of these operations involve any network requests. All processing runs locally in your browser session.</p>
+      </div>
 
-      <h2>Third Parties</h2>
-      <p>DocFill does not share any data with third parties. The only external resource loaded is the Microsoft Office.js library (from Microsoft's CDN, required for all Office add-ins).</p>
+      <!-- Data Storage -->
+      <div class="card" id="data-storage">
+        <div class="section-header">
+          <div class="section-icon violet">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <h2>Data Storage</h2>
+        </div>
+        <p>DocFill stores a small amount of configuration data in your browser's localStorage. This includes:</p>
+        <ul>
+          <li>Field labels you have customized</li>
+          <li>Field types (text, date, long text)</li>
+          <li>Date format preferences</li>
+        </ul>
+        <p>This configuration data:</p>
+        <ul>
+          <li>Never leaves your device</li>
+          <li>Is not sent to any server</li>
+          <li>Is not shared with any third party</li>
+          <li>Can be cleared at any time through your browser settings</li>
+        </ul>
+      </div>
 
-      <h2>Changes to This Policy</h2>
-      <p>If we make changes to this privacy policy, we will update this page. If we introduce features that change how data is handled (such as server-side processing), we will update this policy before those features are released.</p>
+      <!-- Data Collection -->
+      <div class="card" id="data-collection">
+        <div class="section-header">
+          <div class="section-icon green">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <h2>Data Collection</h2>
+        </div>
+        <p>DocFill does not collect any personal information. Specifically, we do not use:</p>
+        <ul>
+          <li>Analytics or usage tracking</li>
+          <li>Cookies</li>
+          <li>Telemetry</li>
+          <li>Error reporting services</li>
+          <li>Advertising or marketing pixels</li>
+        </ul>
+      </div>
 
-      <h2>Contact</h2>
-      <p>If you have questions about this privacy policy, please reach out via our <a href="https://docfill.smplhq.com/support.html">support page</a>.</p>
-    </div>
-  </main>
-  <p class="updated">Last updated: April 9, 2026</p>
+      <!-- Local Processing -->
+      <div class="card" id="local-processing">
+        <div class="section-header">
+          <div class="section-icon amber">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <h2>Your Documents Stay on Your Device</h2>
+        </div>
+        <p>Your document content is never transmitted to our servers. Two external resources are loaded when DocFill starts:</p>
+        <ul>
+          <li><strong>Add-in code</strong> -- served from Cloudflare Pages (our hosting provider)</li>
+          <li><strong>Office.js library</strong> -- served from Microsoft's CDN (required for all Office add-ins)</li>
+        </ul>
+        <p>After these files load, all document processing happens entirely within your browser. No document text, placeholder values, or filled content is ever sent anywhere.</p>
+      </div>
+
+      <!-- Third Parties -->
+      <div class="card" id="third-parties">
+        <div class="section-header">
+          <div class="section-icon slate">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <h2>Third Parties</h2>
+        </div>
+        <p>DocFill does not share any data with third parties. The only external resource loaded is:</p>
+        <ul>
+          <li><strong>Microsoft Office.js</strong> -- the standard library required for all Office add-ins, loaded from Microsoft's CDN</li>
+        </ul>
+        <p>No user data, document content, or usage information is transmitted to Microsoft, Cloudflare, or any other third party through DocFill.</p>
+      </div>
+
+      <!-- Changes -->
+      <div class="card" id="changes">
+        <div class="section-header">
+          <div class="section-icon rose">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h2>Changes to This Policy</h2>
+        </div>
+        <p>If we update this privacy policy, we will revise this page with the new date. If we ever introduce features that change how data is handled (such as server-side processing), we will update this policy before those features are released.</p>
+      </div>
+
+      <!-- Contact -->
+      <div class="card" id="contact">
+        <div class="section-header">
+          <div class="section-icon sky">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h2>Contact</h2>
+        </div>
+        <p>If you have questions about this privacy policy, please reach out via our <a href="https://docfill.smplhq.com/support">support page</a>.</p>
+      </div>
+
+    </main>
+  </div>
+
+  <p class="updated">Last updated: April 19, 2026</p>
+
+  <script>
+    // Sidebar active-link highlighting via Intersection Observer
+    const sections = document.querySelectorAll('.card[id], .trust-badge[id]');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(link => link.classList.remove('active'));
+          const active = document.querySelector('.sidebar a[href="#' + entry.target.id + '"]');
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+
+    sections.forEach(section => observer.observe(section));
+  </script>
 </body>
 </html>
