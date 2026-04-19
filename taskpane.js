@@ -2598,13 +2598,15 @@ async function createPlaceholder() {
       const exactRaw = await searchAllBodies(context, text, { matchCase: true, matchWholeWord: wholeWord });
       const exactDeduped = await dedupeRanges(context, exactRaw);
 
-      // Check parent CCs for exact matches
+      // Check parent CCs for exact matches -- only skip ranges inside DocFill CCs
       for (const r of exactDeduped) {
         r.parentContentControlOrNullObject.load("tag");
       }
       await context.sync();
-      // Skip ranges inside ANY content control (not just DocFill)
-      const exactItems = exactDeduped.filter((r) => r.parentContentControlOrNullObject.isNullObject);
+      const exactItems = exactDeduped.filter((r) => {
+        const parent = r.parentContentControlOrNullObject;
+        return parent.isNullObject || !parent.tag || !parent.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
       exactCount = exactItems.length;
 
       // Case-insensitive search for variants, also filtering
@@ -2614,7 +2616,10 @@ async function createPlaceholder() {
         r.parentContentControlOrNullObject.load("tag");
       }
       await context.sync();
-      const allItems = allDeduped.filter((r) => r.parentContentControlOrNullObject.isNullObject);
+      const allItems = allDeduped.filter((r) => {
+        const parent = r.parentContentControlOrNullObject;
+        return parent.isNullObject || !parent.tag || !parent.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
       allCount = allItems.length;
 
       const variantCount = allCount - exactCount;
@@ -2873,8 +2878,11 @@ async function confirmReplace(mode) {
       }
       await context.sync();
 
-      // Skip ranges inside ANY content control
-      const freeRanges = items.filter((range) => range.parentContentControlOrNullObject.isNullObject);
+      // Skip ranges inside DocFill content controls only
+      const freeRanges = items.filter((range) => {
+        const parent = range.parentContentControlOrNullObject;
+        return parent.isNullObject || !parent.tag || !parent.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
 
       if (freeRanges.length === 0) return;
 
@@ -3245,10 +3253,13 @@ async function navigateMatch(delta) {
       const rawItems = await searchAllBodies(context, pendingCreateText, searchOpts);
       const deduped = await dedupeRanges(context, rawItems);
 
-      // Batch parent-CC checks in one sync
+      // Batch parent-CC checks -- only skip ranges inside DocFill CCs
       for (const r of deduped) r.parentContentControlOrNullObject.load("tag");
       await context.sync();
-      const freeRanges = deduped.filter((r) => r.parentContentControlOrNullObject.isNullObject);
+      const freeRanges = deduped.filter((r) => {
+        const parent = r.parentContentControlOrNullObject;
+        return parent.isNullObject || !parent.tag || !parent.tag.startsWith(DOCFILL_TAG_PREFIX);
+      });
 
       if (chipNavGeneration !== myGeneration) return;
 
