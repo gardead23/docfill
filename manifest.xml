@@ -11,8 +11,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DocFill"/>
   <Description DefaultValue="Fill {{placeholders}} in your Word templates with a simple form."/>
-  <IconUrl DefaultValue="https://docfill.smplhq.com/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://docfill.smplhq.com/icon-128.png"/>
+  <IconUrl DefaultValue="https://docfill.smplhq.com/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://docfill.smplhq.com/icon-64.png"/>
   <SupportUrl DefaultValue="https://docfill.smplhq.com/support"/>
 
   <Hosts>
