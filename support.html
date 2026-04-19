@@ -12,255 +12,477 @@
       color: #111827;
       background: #f3f4f6;
       -webkit-font-smoothing: antialiased;
-      line-height: 1.6;
+      line-height: 1.7;
     }
+
+    /* ── Hero header ── */
     header {
-      background: #0f172a;
-      padding: 24px 32px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+      padding: 80px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(59,130,246,0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 30%, rgba(99,102,241,0.10) 0%, transparent 50%);
+      pointer-events: none;
     }
     header h1 {
       color: white;
-      font-size: 20px;
-      font-weight: 600;
+      font-size: 32px;
+      font-weight: 700;
+      position: relative;
     }
     header p {
-      color: rgba(255,255,255,0.6);
-      font-size: 13px;
-      margin-top: 4px;
+      color: rgba(255,255,255,0.55);
+      font-size: 15px;
+      margin-top: 8px;
+      position: relative;
     }
-    main {
-      max-width: 680px;
-      margin: 32px auto;
+
+    /* ── Layout: sidebar + content ── */
+    .page-layout {
+      max-width: 960px;
+      margin: 40px auto;
       padding: 0 24px;
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
     }
+
+    /* ── Sticky sidebar TOC ── */
+    .sidebar {
+      position: sticky;
+      top: 32px;
+      width: 200px;
+      flex-shrink: 0;
+    }
+    .sidebar nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sidebar a {
+      display: block;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b7280;
+      text-decoration: none;
+      border-radius: 6px;
+      border-left: 2px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .sidebar a:hover {
+      color: #111827;
+      background: rgba(0,0,0,0.03);
+    }
+    .sidebar a.active {
+      color: #2563eb;
+      background: #eff6ff;
+      border-left-color: #2563eb;
+      font-weight: 600;
+    }
+
+    /* ── Main content ── */
+    .content {
+      flex: 1;
+      min-width: 0;
+    }
+
     .card {
       background: white;
+      border-radius: 12px;
+      padding: 36px 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+      margin-bottom: 20px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .section-icon {
+      width: 36px;
+      height: 36px;
       border-radius: 10px;
-      padding: 28px 24px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
+    .section-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+    .section-icon.blue   { background: #eff6ff; color: #2563eb; }
+    .section-icon.violet { background: #f5f3ff; color: #7c3aed; }
+    .section-icon.green  { background: #f0fdf4; color: #16a34a; }
+    .section-icon.amber  { background: #fffbeb; color: #d97706; }
+    .section-icon.rose   { background: #fff1f2; color: #e11d48; }
+    .section-icon.sky    { background: #f0f9ff; color: #0284c7; }
+
     h2 {
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 18px;
+      font-weight: 700;
       color: #0f172a;
-      margin-bottom: 12px;
     }
-    p { margin-bottom: 12px; }
-    .help-section { margin-bottom: 24px; }
+
+    .help-section { margin-bottom: 28px; }
     .help-section:last-child { margin-bottom: 0; }
     .help-section h3 {
       font-size: 14px;
       font-weight: 600;
       color: #374151;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-    .help-section p, .help-section ul { color: #4b5563; font-size: 14px; }
+    .help-section p, .help-section ul { color: #4b5563; font-size: 14px; line-height: 1.7; }
+    p { margin-bottom: 12px; }
     .help-section ul {
       margin: 8px 0 0 20px;
       list-style: disc;
     }
-    .help-section li {
-      margin-bottom: 4px;
+    .help-section li { margin-bottom: 6px; }
+
+    /* ── Accordions (FAQ) ── */
+    details {
+      border-bottom: 1px solid #f3f4f6;
     }
-    .contact-card {
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
+    details:last-of-type {
+      border-bottom: none;
     }
-    a {
-      color: #2563eb;
-      text-decoration: none;
-    }
-    a:hover { text-decoration: underline; }
-    code {
-      background: #f3f4f6;
-      padding: 1px 5px;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-    .step-number {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #2563eb;
-      color: white;
-      font-size: 12px;
+    details summary {
+      padding: 16px 0;
+      font-size: 14px;
       font-weight: 600;
-      margin-right: 8px;
-      flex-shrink: 0;
-    }
-    .step {
+      color: #374151;
+      cursor: pointer;
+      list-style: none;
       display: flex;
-      align-items: flex-start;
-      margin-bottom: 12px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      user-select: none;
     }
-    .step p { margin-bottom: 0; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::after {
+      content: "";
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      transition: transform 0.2s ease;
+    }
+    details[open] summary::after {
+      transform: rotate(180deg);
+    }
+    details .accordion-body {
+      padding: 0 0 20px 0;
+      color: #4b5563;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    details .accordion-body p { margin-bottom: 8px; }
+    details .accordion-body p:last-child { margin-bottom: 0; }
+    details .accordion-body ul {
+      margin: 4px 0 0 20px;
+      list-style: disc;
+    }
+    details .accordion-body li { margin-bottom: 4px; }
+
+    /* ── Tip box ── */
     .tip {
       background: #fffbeb;
       border: 1px solid #fde68a;
       border-radius: 8px;
-      padding: 12px 16px;
+      padding: 14px 18px;
       font-size: 13px;
       color: #92400e;
-      margin-top: 12px;
+      margin-top: 16px;
+      line-height: 1.6;
+    }
+
+    /* ── Contact card ── */
+    .contact-card {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+    }
+
+    /* ── Code ── */
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    /* ── Links ── */
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Responsive: hide sidebar on small screens ── */
+    @media (max-width: 768px) {
+      .page-layout {
+        flex-direction: column;
+        gap: 0;
+      }
+      .sidebar { display: none; }
+      header { padding: 56px 24px; }
+      header h1 { font-size: 26px; }
+      .card { padding: 28px 22px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>DocFill - Support</h1>
-    <p>Help center for DocFill, the Word template filler</p>
+    <h1>How can we help?</h1>
+    <p>Guides, tips, and answers for DocFill</p>
   </header>
-  <main>
 
-    <div class="card">
-      <h2>Getting Started</h2>
+  <div class="page-layout">
+    <!-- Sticky sidebar TOC -->
+    <aside class="sidebar">
+      <nav>
+        <a href="#getting-started" class="active">Getting Started</a>
+        <a href="#creating-templates">Creating Templates</a>
+        <a href="#importing-data">Importing Data</a>
+        <a href="#faq">Common Questions</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="#contact">Contact Us</a>
+      </nav>
+    </aside>
 
-      <div class="help-section">
-        <h3>Step 1: Add Placeholders to Your Document</h3>
-        <p>Type placeholders anywhere in your Word document using double curly braces:</p>
-        <p><code>{{client_name}}</code> <code>{{start_date}}</code> <code>{{total_fee}}</code></p>
-        <p>Use letters, numbers, and underscores for placeholder names. Placeholders work in the document body, headers, and footers.</p>
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- Getting Started -->
+      <div class="card" id="getting-started">
+        <div class="section-header">
+          <div class="section-icon blue">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          </div>
+          <h2>Getting Started</h2>
+        </div>
+
+        <div class="help-section">
+          <h3>Step 1: Add Placeholders to Your Document</h3>
+          <p>Type placeholders anywhere in your Word document using double curly braces:</p>
+          <p><code>{{client_name}}</code> <code>{{start_date}}</code> <code>{{total_fee}}</code></p>
+          <p>Use letters, numbers, and underscores for placeholder names. Placeholders work in the document body, headers, and footers.</p>
+        </div>
+
+        <div class="help-section">
+          <h3>Step 2: Scan Your Document</h3>
+          <p>Open the DocFill task pane from the Home ribbon, go to the <strong>Fill</strong> tab, and click <strong>Scan Document</strong>. DocFill detects all placeholders and builds a form for you.</p>
+        </div>
+
+        <div class="help-section">
+          <h3>Step 3: Fill In Your Values</h3>
+          <p>Type values into the form fields. DocFill supports three field types:</p>
+          <ul>
+            <li><strong>Text</strong> -- single-line input for names, numbers, short text</li>
+            <li><strong>Date</strong> -- month/day/year dropdowns with format options</li>
+            <li><strong>Long text</strong> -- multi-line textarea for descriptions, terms, addresses</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h3>Step 4: Fill the Document</h3>
+          <p>Click <strong>Fill Document</strong> to replace all placeholders with your values. Empty fields are highlighted so you can complete them later.</p>
+        </div>
       </div>
 
-      <div class="help-section">
-        <h3>Step 2: Scan Your Document</h3>
-        <p>Open the DocFill task pane from the Home ribbon, go to the <strong>Fill</strong> tab, and click <strong>Scan Document</strong>. DocFill detects all placeholders and builds a form for you.</p>
+      <!-- Creating Templates -->
+      <div class="card" id="creating-templates">
+        <div class="section-header">
+          <div class="section-icon violet">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <h2>Creating Templates</h2>
+        </div>
+
+        <div class="help-section">
+          <h3>Using the Create Tab</h3>
+          <p>Don't want to type <code>{{}}</code> brackets manually? Switch to the <strong>Create</strong> tab, select any text in your document, give it a name, and click <strong>Convert to Placeholder</strong>. DocFill wraps it in a placeholder field for you.</p>
+          <p>If the text appears multiple times, you can convert just one occurrence, all exact matches, or all matches including different capitalizations.</p>
+        </div>
+        <div class="help-section">
+          <h3>Navigating Placeholders</h3>
+          <p>Click any placeholder in the list to jump to it in the document. Click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're viewing (e.g., "2 of 3").</p>
+        </div>
       </div>
 
-      <div class="help-section">
-        <h3>Step 3: Fill In Your Values</h3>
-        <p>Type values into the form fields. DocFill supports three field types:</p>
-        <ul>
-          <li><strong>Text</strong> -- single-line input for names, numbers, short text</li>
-          <li><strong>Date</strong> -- month/day/year dropdowns with format options</li>
-          <li><strong>Long text</strong> -- multi-line textarea for descriptions, terms, addresses</li>
-        </ul>
+      <!-- Importing Data -->
+      <div class="card" id="importing-data">
+        <div class="section-header">
+          <div class="section-icon green">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <h2>Importing Data</h2>
+        </div>
+
+        <div class="help-section">
+          <h3>From a CSV File</h3>
+          <p>Click the <strong>Import</strong> button in the Fill tab and upload a <code>.csv</code> file. DocFill supports two formats:</p>
+          <ul>
+            <li><strong>Two-column</strong> -- each row is a field name and value (e.g., <code>client_name,Acme Corp</code>)</li>
+            <li><strong>Multi-column spreadsheet</strong> -- column headers are field names, each row is a record. DocFill shows a row picker so you choose which row to import.</li>
+          </ul>
+        </div>
+        <div class="help-section">
+          <h3>By Pasting</h3>
+          <p>Copy two columns from Excel or Google Sheets and paste directly into the import panel. Tab-separated and comma-separated formats are auto-detected.</p>
+        </div>
+        <div class="help-section">
+          <h3>Key Matching</h3>
+          <p>DocFill matches imported field names to your placeholders flexibly. All of these will match <code>{{client_name}}</code>:</p>
+          <ul>
+            <li><code>client_name</code></li>
+            <li><code>Client Name</code></li>
+            <li><code>CLIENT_NAME</code></li>
+            <li><code>client-name</code></li>
+            <li><code>{{client_name}}</code></li>
+          </ul>
+        </div>
+        <div class="tip">Tip: After importing, review the values in the form before clicking Fill Document. Import populates the form only -- it does not change your document until you click Fill.</div>
       </div>
 
-      <div class="help-section">
-        <h3>Step 4: Fill the Document</h3>
-        <p>Click <strong>Fill Document</strong> to replace all placeholders with your values. Empty fields are highlighted so you can complete them later.</p>
-      </div>
-    </div>
+      <!-- Common Questions (Accordions) -->
+      <div class="card" id="faq">
+        <div class="section-header">
+          <div class="section-icon amber">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h2>Common Questions</h2>
+        </div>
 
-    <div class="card">
-      <h2>Creating Templates</h2>
-      <div class="help-section">
-        <h3>Using the Create Tab</h3>
-        <p>Don't want to type <code>{{}}</code> brackets manually? Switch to the <strong>Create</strong> tab, select any text in your document, give it a name, and click <strong>Convert to Placeholder</strong>. DocFill wraps it in a placeholder field for you.</p>
-        <p>If the text appears multiple times, you can convert just one occurrence, all exact matches, or all matches including different capitalizations.</p>
-      </div>
-      <div class="help-section">
-        <h3>Navigating Placeholders</h3>
-        <p>Click any placeholder in the list to jump to it in the document. Click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're viewing (e.g., "2 of 3").</p>
-      </div>
-    </div>
+        <details>
+          <summary>My placeholders aren't being detected</summary>
+          <div class="accordion-body">
+            <p>Make sure placeholders use double curly braces: <code>{{name}}</code>. The text inside must be a single word or use underscores (e.g., <code>{{first_name}}</code>). Avoid spaces inside the braces.</p>
+          </div>
+        </details>
 
-    <div class="card">
-      <h2>Importing Data</h2>
-      <div class="help-section">
-        <h3>From a CSV File</h3>
-        <p>Click the <strong>Import</strong> button in the Fill tab and upload a <code>.csv</code> file. DocFill supports two formats:</p>
-        <ul>
-          <li><strong>Two-column</strong> -- each row is a field name and value (e.g., <code>client_name,Acme Corp</code>)</li>
-          <li><strong>Multi-column spreadsheet</strong> -- column headers are field names, each row is a record. DocFill shows a row picker so you choose which row to import.</li>
-        </ul>
-      </div>
-      <div class="help-section">
-        <h3>By Pasting</h3>
-        <p>Copy two columns from Excel or Google Sheets and paste directly into the import panel. Tab-separated and comma-separated formats are auto-detected.</p>
-      </div>
-      <div class="help-section">
-        <h3>Key Matching</h3>
-        <p>DocFill matches imported field names to your placeholders flexibly. All of these will match <code>{{client_name}}</code>:</p>
-        <ul>
-          <li><code>client_name</code></li>
-          <li><code>Client Name</code></li>
-          <li><code>CLIENT_NAME</code></li>
-          <li><code>client-name</code></li>
-          <li><code>{{client_name}}</code></li>
-        </ul>
-      </div>
-      <div class="tip">Tip: After importing, review the values in the form before clicking Fill Document. Import populates the form only -- it does not change your document until you click Fill.</div>
-    </div>
+        <details>
+          <summary>Can I re-fill without resetting?</summary>
+          <div class="accordion-body">
+            <p>Yes. Change the values in the form and click "Fill Document" again. DocFill updates the document with the new values automatically.</p>
+          </div>
+        </details>
 
-    <div class="card">
-      <h2>Common Questions</h2>
+        <details>
+          <summary>Can I undo a fill?</summary>
+          <div class="accordion-body">
+            <p>Yes, two ways:</p>
+            <ul>
+              <li><strong>Per-field undo</strong> -- click the reset icon inside any filled field to restore just that placeholder</li>
+              <li><strong>Full reset</strong> -- click "Reset All Fields" to restore every placeholder. Your other document edits are preserved.</li>
+            </ul>
+          </div>
+        </details>
 
-      <div class="help-section">
-        <h3>My placeholders aren't being detected</h3>
-        <p>Make sure placeholders use double curly braces: <code>{{name}}</code>. The text inside must be a single word or use underscores (e.g., <code>{{first_name}}</code>). Avoid spaces inside the braces.</p>
-      </div>
+        <details>
+          <summary>What date formats are supported?</summary>
+          <div class="accordion-body">
+            <p>DocFill supports five date output formats: Long (March 22, 2026), Abbreviated (Mar 22, 2026), US Short (03/22/2026), International (22/03/2026), and ISO (2026-03-22). Set a global default or override per field.</p>
+          </div>
+        </details>
 
-      <div class="help-section">
-        <h3>Can I re-fill without resetting?</h3>
-        <p>Yes. Change the values in the form and click "Fill Document" again. DocFill updates the document with the new values automatically.</p>
-      </div>
+        <details>
+          <summary>Does DocFill work in headers and footers?</summary>
+          <div class="accordion-body">
+            <p>Yes. DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported.</p>
+          </div>
+        </details>
 
-      <div class="help-section">
-        <h3>Can I undo a fill?</h3>
-        <p>Yes, two ways:</p>
-        <ul>
-          <li><strong>Per-field undo</strong> -- click the reset icon inside any filled field to restore just that placeholder</li>
-          <li><strong>Full reset</strong> -- click "Reset All Fields" to restore every placeholder. Your other document edits are preserved.</li>
-        </ul>
-      </div>
+        <details>
+          <summary>Can I rename a field label?</summary>
+          <div class="accordion-body">
+            <p>Yes. Click the pencil icon next to any field label to edit its display name. This changes only the label shown in the form -- it does not change the placeholder text in your document.</p>
+          </div>
+        </details>
 
-      <div class="help-section">
-        <h3>What date formats are supported?</h3>
-        <p>DocFill supports five date output formats: Long (March 22, 2026), Abbreviated (Mar 22, 2026), US Short (03/22/2026), International (22/03/2026), and ISO (2026-03-22). Set a global default or override per field.</p>
+        <details>
+          <summary>Where is my data stored?</summary>
+          <div class="accordion-body">
+            <p>Your field settings (labels, types, date formats) are saved in your browser's local storage. No document content or placeholder values are ever sent to any server. Everything stays on your device. See our <a href="https://docfill.smplhq.com/privacy">privacy policy</a> for details.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Does DocFill work on Word for the web?</summary>
+          <div class="accordion-body">
+            <p>Yes. DocFill works on Word for Mac, Word for Windows, and Word for the web.</p>
+          </div>
+        </details>
       </div>
 
-      <div class="help-section">
-        <h3>Does DocFill work in headers and footers?</h3>
-        <p>Yes. DocFill scans and fills placeholders in the document body, headers, and footers. Text boxes and floating shapes are not supported.</p>
+      <!-- Troubleshooting -->
+      <div class="card" id="troubleshooting">
+        <div class="section-header">
+          <div class="section-icon rose">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <h2>Troubleshooting</h2>
+        </div>
+
+        <div class="help-section">
+          <h3>Fields not found after Ctrl+Z</h3>
+          <p>If you undo changes in Word, DocFill picks up the reverted state the next time you scan. Click <strong>Rescan</strong> to refresh the field list.</p>
+        </div>
+
+        <div class="help-section">
+          <h3>Scan is slow on large documents</h3>
+          <p>DocFill scans the document body first so you can start filling immediately. Headers and footers are scanned in the background. A status banner shows progress.</p>
+        </div>
+
+        <div class="help-section">
+          <h3>Import says "None of this data matched"</h3>
+          <p>Check that your imported field names match the placeholder names in your document. DocFill is flexible with formatting (spaces, hyphens, capitalization all work), but the base words must match. For example, <code>Client Name</code> matches <code>{{client_name}}</code>, but <code>Customer Name</code> does not.</p>
+        </div>
       </div>
 
-      <div class="help-section">
-        <h3>Can I rename a field label?</h3>
-        <p>Yes. Click the pencil icon next to any field label to edit its display name. This changes only the label shown in the form -- it does not change the placeholder text in your document.</p>
+      <!-- Contact -->
+      <div class="card contact-card" id="contact">
+        <div class="section-header">
+          <div class="section-icon sky">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h2>Contact Us</h2>
+        </div>
+        <p>Need help with something not covered above? Reach out to us:</p>
+        <p><strong>Email:</strong> <a href="mailto:support@smplhq.com">support@smplhq.com</a></p>
+        <p>We aim to respond within 1-2 business days.</p>
       </div>
 
-      <div class="help-section">
-        <h3>Where is my data stored?</h3>
-        <p>Your field settings (labels, types, date formats) are saved in your browser's local storage. No document content or placeholder values are ever sent to any server. Everything stays on your device. See our <a href="https://docfill.smplhq.com/privacy">privacy policy</a> for details.</p>
-      </div>
+    </main>
+  </div>
 
-      <div class="help-section">
-        <h3>Does DocFill work on Word for the web?</h3>
-        <p>Yes. DocFill works on Word for Mac, Word for Windows, and Word for the web.</p>
-      </div>
-    </div>
+  <script>
+    // Sidebar active-link highlighting via Intersection Observer
+    const sections = document.querySelectorAll('.card[id]');
+    const navLinks = document.querySelectorAll('.sidebar a');
 
-    <div class="card">
-      <h2>Troubleshooting</h2>
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(link => link.classList.remove('active'));
+          const active = document.querySelector('.sidebar a[href="#' + entry.target.id + '"]');
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
 
-      <div class="help-section">
-        <h3>Fields not found after Ctrl+Z</h3>
-        <p>If you undo changes in Word, DocFill picks up the reverted state the next time you scan. Click <strong>Rescan</strong> to refresh the field list.</p>
-      </div>
-
-      <div class="help-section">
-        <h3>Scan is slow on large documents</h3>
-        <p>DocFill scans the document body first so you can start filling immediately. Headers and footers are scanned in the background. A status banner shows progress.</p>
-      </div>
-
-      <div class="help-section">
-        <h3>Import says "None of this data matched"</h3>
-        <p>Check that your imported field names match the placeholder names in your document. DocFill is flexible with formatting (spaces, hyphens, capitalization all work), but the base words must match. For example, <code>Client Name</code> matches <code>{{client_name}}</code>, but <code>Customer Name</code> does not.</p>
-      </div>
-    </div>
-
-    <div class="card contact-card">
-      <h2>Contact Us</h2>
-      <p>Need help with something not covered above? Reach out to us:</p>
-      <p><strong>Email:</strong> <a href="mailto:support@smplhq.com">support@smplhq.com</a></p>
-      <p>We aim to respond within 1-2 business days.</p>
-    </div>
-  </main>
+    sections.forEach(section => observer.observe(section));
+  </script>
 </body>
 </html>
