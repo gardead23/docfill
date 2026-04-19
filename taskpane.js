@@ -2857,23 +2857,9 @@ async function confirmReplace(mode) {
       const wholeWord = /^\w+(\s+\w+)*$/.test(text);
       let items;
       if (useMatchIndex) {
-        // Body first, fall back to full search if no free body matches
-        const bodyResults = context.document.body.search(text, { matchCase, matchWholeWord: wholeWord });
-        bodyResults.load("items");
-        await context.sync();
-        // Check for free (non-CC) body matches
-        let bodyFree = bodyResults.items;
-        if (bodyFree.length > 0) {
-          for (const r of bodyFree) r.parentContentControlOrNullObject.load("isNullObject");
-          await context.sync();
-          bodyFree = bodyFree.filter((r) => r.parentContentControlOrNullObject.isNullObject);
-        }
-        if (bodyFree.length > 0) {
-          items = bodyResults.items; // use full body items for CC filtering below
-        } else {
-          const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: wholeWord });
-          items = await dedupeRanges(context, rawItems);
-        }
+        // Full search to match navigateMatch scope
+        const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: wholeWord });
+        items = await dedupeRanges(context, rawItems);
       } else {
         const rawItems = await searchAllBodies(context, text, { matchCase, matchWholeWord: wholeWord });
         items = await dedupeRanges(context, rawItems);
@@ -3254,35 +3240,15 @@ async function navigateMatch(delta) {
 
   try {
     await Word.run(async (context) => {
-      // Search body first for speed; fall back to full search if no free body matches
+      // Search all bodies (body + headers/footers) for consistent count
       const searchOpts = { matchCase: pendingMatchCase, matchWholeWord: pendingMatchWholeWord };
-      const bodyResults = context.document.body.search(pendingCreateText, searchOpts);
-      bodyResults.load("items");
+      const rawItems = await searchAllBodies(context, pendingCreateText, searchOpts);
+      const deduped = await dedupeRanges(context, rawItems);
+
+      // Batch parent-CC checks in one sync
+      for (const r of deduped) r.parentContentControlOrNullObject.load("tag");
       await context.sync();
-
-      // Check body results for free (non-CC) matches
-      let searchItems = bodyResults.items;
-      let parentChecks = searchItems.map((r) => {
-        const p = r.parentContentControlOrNullObject;
-        p.load("isNullObject");
-        return p;
-      });
-      if (searchItems.length > 0) await context.sync();
-      let freeRanges = searchItems.filter((_, i) => parentChecks[i].isNullObject);
-
-      // Fall back to full search if no free body matches
-      if (freeRanges.length === 0) {
-        const allItems = await searchAllBodies(context, pendingCreateText, searchOpts);
-        const deduped = await dedupeRanges(context, allItems);
-        searchItems = deduped;
-        parentChecks = searchItems.map((r) => {
-          const p = r.parentContentControlOrNullObject;
-          p.load("isNullObject");
-          return p;
-        });
-        if (searchItems.length > 0) await context.sync();
-        freeRanges = searchItems.filter((_, i) => parentChecks[i].isNullObject);
-      }
+      const freeRanges = deduped.filter((r) => r.parentContentControlOrNullObject.isNullObject);
 
       if (chipNavGeneration !== myGeneration) return;
 
