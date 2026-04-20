@@ -156,9 +156,10 @@ npm run test:watch # watch mode
 ## Tips
 
 - **Create tab:** Select text in your doc, give it a name, and DocFill converts it into a placeholder field -- builds your template without typing brackets manually. The input and button stay disabled until you select something.
-- **Multiple occurrences:** When you convert text that appears more than once, you can convert just this occurrence, all exact matches, or all matches including different capitalizations
+- **Multiple occurrences:** When you convert text that appears more than once, you can convert just this occurrence, all exact matches, or all matches including different capitalizations. Use the prev/next arrows to preview each match in the document before deciding.
 - **Existing field linking:** If a placeholder name already exists, you can link to the existing field or choose a different name
-- **Navigate placeholders:** In Create mode, click any item in "Placeholders" to jump to that placeholder in the document; click again to cycle through multiple occurrences. A toast at the bottom shows which occurrence you're on (e.g., "2 of 3").
+- **Navigate placeholders:** Click any field label in the Fill tab or any item in the Create tab's "Placeholders" list to jump to that placeholder in the document. Click again to cycle through multiple occurrences.
+- **Edit labels:** Click the pencil icon next to any field label to rename it. This changes the display name only, not the placeholder in the document.
 - **Delete a placeholder:** Click the x button next to any created placeholder to convert it back to plain text (confirmation required)
 - **Re-fill:** Change a value and click Fill Document again -- it updates the document without needing to clear first
 - **Partial fill:** If you leave some fields empty and click Fill Document, DocFill fills the ones you completed, highlights the empty fields in orange, and scrolls to the first empty one so you can continue
@@ -176,3 +177,19 @@ npm run test:watch # watch mode
 ## Roadmap
 
 - [ ] **AI-assisted filling** -- paste an email or brief and Claude extracts field values automatically, populating the form for review before filling
+- [ ] **Premium import** -- licensing infrastructure for gating import as a paid feature
+
+## Local Testing
+
+For local development, use `manifest-test.xml` which points to `http://localhost:3000`:
+
+```bash
+cd /Users/danny/AI/docfill && npx serve .
+```
+
+Sideload by copying the test manifest to Word's add-in folder:
+```bash
+cp manifest-test.xml ~/Library/Containers/com.microsoft.Word/Data/Documents/wef/
+```
+
+Restart Word and look for "DocFill (Test)" in the Home ribbon. Different add-in ID so both production and test can coexist.

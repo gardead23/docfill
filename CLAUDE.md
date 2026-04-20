@@ -200,6 +200,24 @@ Clicking a row in the "Placeholders" list calls `navigateToChip(name)`, which se
 
 **Floating toast:** `showChipToast(msg)` displays a floating snackbar at the bottom of the task pane (CSS class `chip-toast`, positioned with `position: fixed`). Shows the placeholder name and occurrence index (e.g., "{{name}} (2 of 3)"). Auto-dismisses with opacity fade after 2s. Does not affect layout.
 
+### Match navigation in Create mode
+
+When `createPlaceholder()` finds multiple matches (2+), the confirmation dialog includes prev/next arrows (`< 1 of 4 >`) so users can cycle through matches and preview each one in the document before deciding. Wrap-around cycling (3 of 3 -> next -> 1 of 3).
+
+**State:** `pendingMatchCount`, `pendingMatchIndex`, `pendingMatchCase`, `pendingMatchWholeWord`, `matchNavInFlight`. All cleared in `cancelCreateAction()`, `confirmReplace()`, and `navigateToChip()`.
+
+**`navigateMatch(delta)`:** Re-searches with `searchAllBodies` + `dedupeRanges`, filters to non-DocFill-CC ranges, selects the match at `pendingMatchIndex`. Uses `chipNavGeneration` to invalidate stale navigations. `matchNavInFlight` flag prevents overlapping navigations. All dialog buttons except Cancel disabled during async work.
+
+**Initial match index:** Set to the user's selected occurrence via `compareLocationWith` (includes boundary relations: ContainsStart, ContainsEnd, InsideStart, InsideEnd) so "This one only" defaults to the match the user originally selected.
+
+**`confirmReplace('single')` with match nav:** When `pendingMatchCount > 0`, uses `pendingMatchIndex` with case-insensitive `searchAllBodies` instead of selection-based case-sensitive targeting. This correctly handles capitalization variants.
+
+**Parent-CC filtering:** Create mode filters only skip ranges inside DocFill CCs (tag starts with `docfill:`), not all CCs. This prevents false "already inside a placeholder" errors from Word's built-in content controls. Both `tag` and `isNullObject` are explicitly loaded to avoid stale proxy data.
+
+### Fill tab clickable labels
+
+Field labels in the Fill tab are clickable buttons that call `navigateToChip(key)` to jump to the corresponding placeholder in the document. Pencil icon next to label for editing the display name (tooltip: "Edit label"). Reset button positioned inside the value input area (top-right, tooltip: "Clear value").
+
 ### Header/footer support
 
 All scan, fill, and create operations process the full document: body + all section headers and footers (Primary, FirstPage, EvenPages). Helper functions `getAllBodies(context)` and `searchAllBodies(context, text, options)` enumerate all non-empty Body objects. Content controls in headers/footers are found by the same `contentControls.getByTag()` call (it is document-wide). Linked headers (Link to Previous) are handled by processing bodies sequentially for mutating operations -- placeholders already consumed by a linked copy are naturally skipped.
@@ -268,7 +286,7 @@ When the form is re-rendered (e.g., after HF scan finds new fields, or after inc
 ## Icons
 
 Source file: `DocFill Icon.png` (1080x1080, RGBA, transparent background).
-Generated sizes: 16, 32, 64, 80, 128px. The 64px and 128px sizes are required by AppSource (`<IconUrl>` and `<HighResolutionIconUrl>`).
+Generated sizes: 16, 32, 64, 80, 128px. AppSource requires `<IconUrl>` = 32x32 and `<HighResolutionIconUrl>` = 64x64. Ribbon icons use 16, 32, and 80px.
 
 To regenerate all icons from the source:
 
@@ -391,27 +409,28 @@ Uses system font stack: `"Segoe UI", -apple-system, BlinkMacSystemFont, system-u
 
 ## AppSource Submission
 
-**Status:** In progress. Preparing for Microsoft AppSource (Office Add-in Store) listing.
+**Status:** Submitted April 19, 2026. Awaiting Microsoft review (typically 3-5 business days).
 
-### Completed
-- Privacy policy page (`privacy.html`) -- describes local-only data handling
-- Support page (`support.html`) -- quick start guide, FAQ, contact email (support@smplhq.com)
-- Manifest updated: `<SupportUrl>`, correct icon sizes (64/128). Passes `npx office-addin-manifest validate`.
-- Icon sizes generated: 16, 32, 64, 80, 128px
-- **Note:** `<LongDescription>` and `<PrivacyUrl>` are NOT valid in the XML manifest schema -- they must be entered in Partner Center during submission, not in manifest.xml.
+### Submission Details
+- **Partner Center account:** Created under gardead23@gmail.com
+- **Offer type:** Office Add-in (Microsoft 365 and Copilot program)
+- **Categories:** Productivity, Content management, Utilities + tools
+- **EULA:** Microsoft Standard Contract
+- **Privacy policy:** https://docfill.smplhq.com/privacy
+- **Support page:** https://docfill.smplhq.com/support
+- **Markets:** All 242 markets
+- **Additional purchases:** None (free)
+- **Manifest icon sizes:** IconUrl = 32x32, HighResolutionIconUrl = 64x64
 
-### Remaining Before Submission
-- [ ] Create Microsoft Partner Center account ($19 individual / $99 company)
-- [ ] Complete identity verification and tax/payout profile
-- [ ] Take screenshots (1366x768 recommended) showing scan, fill, and create workflows
-- [ ] Write testing instructions for Microsoft reviewer
-- [ ] Enter long description and privacy policy URL in Partner Center (not in manifest.xml -- schema rejects them there)
-- [ ] Test add-in in Word for the web (reviewers often test there first)
-- [ ] Submit via Partner Center > Marketplace offers > Office Add-ins
+### Assets Submitted
+- 5 screenshots (Mac, showing fill, import, row picker, create, and reset workflows)
+- Testing instructions for Microsoft reviewer (create template, scan, fill, import, create mode)
+- Long description entered in Partner Center (not in manifest.xml -- schema rejects it there)
+- Privacy policy URL and support URL entered in Partner Center
 
 ### Distribution Strategy
 - **AppSource** for public discovery and free install
-- **smplhq.com** for licensing/billing -- add-in checks license against SMPL HQ backend
+- **smplhq.com** for licensing/billing (future -- premium features like import)
 - Direct sideload option available for enterprise users via manifest URL
 
 ## Future: AI Phase
