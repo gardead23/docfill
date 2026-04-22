@@ -7,7 +7,7 @@
 
   <Id>f2f32597-ec21-45f0-bd23-e70d741ca438</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>DocFill</ProviderName>
+  <ProviderName>SMPL HQ</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DocFill"/>
   <Description DefaultValue="Fill {{placeholders}} in your Word templates with a simple form."/>

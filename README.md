@@ -176,7 +176,18 @@ npm run test:watch # watch mode
 
 ## Roadmap
 
-- [ ] **AI-assisted filling** -- paste an email or brief and Claude extracts field values automatically, populating the form for review before filling
+### Planned (Free Tier)
+- [ ] **Dropdown/select fields** -- predefined option lists for fields (reduces errors on repetitive values)
+- [ ] **Field validation rules** -- optional constraints (required, max length, format patterns)
+
+### Planned (Pro Tier)
+- [ ] **AI-assisted filling** -- optional cloud feature (user opt-in): paste an email or brief and AI extracts field values, populating the form for review before filling
+- [ ] **Batch generation** -- one template + multiple data rows = multiple filled documents, auto-saved or zipped
+- [ ] **Saved profiles** -- save reusable data sets ("Client A", "Client B") and one-click fill any template
+- [ ] **Conditional sections** -- show/hide paragraphs based on field values (e.g., `{{#if guarantor}}`)
+- [ ] **Repeating table rows** -- dynamically grow tables for line items, invoices, attendee lists
+
+### Under Consideration
 - [ ] **Premium import** -- licensing infrastructure for gating import as a paid feature
 
 ## Local Testing

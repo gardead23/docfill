@@ -4,11 +4,75 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DocFill</title>
-  <link rel="stylesheet" href="taskpane.css?v=142"/>
+  <link rel="stylesheet" href="taskpane.css?v=144"/>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
-  <div id="app">
+  <div id="app" class="app-loading">
+
+    <!-- Boot loader (visible until Office.onReady fires) -->
+    <div id="boot-loader">Loading DocFill...</div>
+
+    <!-- Welcome screen (first run experience) -->
+    <div id="welcome-screen" style="display:none">
+      <div class="welcome-header">
+        <div class="welcome-logo">
+          <svg width="36" height="36" viewBox="0 0 18 18" fill="none">
+            <rect width="18" height="18" rx="4" fill="white" fill-opacity="0.15"/>
+            <path d="M4 9h10M9 4v10" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            <rect x="5.5" y="5.5" width="3" height="3" rx="0.75" fill="white" fill-opacity="0.7"/>
+            <rect x="9.5" y="9.5" width="3" height="3" rx="0.75" fill="white" fill-opacity="0.7"/>
+          </svg>
+          <span class="welcome-title">Welcome to DocFill</span>
+        </div>
+        <p class="welcome-subtitle">A simple way to turn your documents into reusable templates, saving hours of manual data entry.</p>
+      </div>
+
+      <div class="welcome-body">
+        <div class="welcome-section">
+          <p class="welcome-heading">Why use DocFill?</p>
+          <div class="welcome-steps">
+            <div class="welcome-step">
+              <span class="welcome-step-num">1</span>
+              <div>
+                <p class="welcome-step-title">Automate repetitive typing</p>
+                <p class="welcome-step-desc">Type placeholders like <strong>{{client_name}}</strong> or <strong>{{date}}</strong> anywhere to eliminate manual search-and-replace across contracts or proposals.</p>
+              </div>
+            </div>
+            <div class="welcome-step">
+              <span class="welcome-step-num">2</span>
+              <div>
+                <p class="welcome-step-title">Eliminate costly errors</p>
+                <p class="welcome-step-desc">DocFill builds a simple form for all placeholders. Never accidentally leave old client details behind in a finalized document.</p>
+              </div>
+            </div>
+            <div class="welcome-step">
+              <span class="welcome-step-num">3</span>
+              <div>
+                <p class="welcome-step-title">Import spreadsheet data</p>
+                <p class="welcome-step-desc">Upload a CSV or paste from Excel to populate matching fields without retyping.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="welcome-section">
+          <p class="welcome-heading">Great for</p>
+          <div class="welcome-usecases">
+            <span class="welcome-tag">Contracts</span>
+            <span class="welcome-tag">Invoices</span>
+            <span class="welcome-tag">Letters</span>
+            <span class="welcome-tag">Proposals</span>
+            <span class="welcome-tag">HR forms</span>
+            <span class="welcome-tag">Reports</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary welcome-cta" onclick="dismissWelcome()">
+          Get Started
+        </button>
+      </div>
+    </div>
 
     <header>
       <div class="header-logo">
@@ -165,6 +229,6 @@
     </footer>
 
   </div>
-  <script src="taskpane.js?v=157"></script>
+  <script src="taskpane.js?v=159"></script>
 </body>
 </html>

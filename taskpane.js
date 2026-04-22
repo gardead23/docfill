@@ -163,6 +163,8 @@ async function dedupeRanges(context, ranges) {
 
 // ── Office Initialization ──────────────────────────────────────────────────────
 
+const WELCOME_LS_KEY = "docfill:welcomeDismissed";
+
 Office.onReady(function (info) {
   if (info.host === Office.HostType.Word) {
     Office.context.document.addHandlerAsync(
@@ -170,7 +172,47 @@ Office.onReady(function (info) {
       onSelectionChanged
     );
   }
+  // Show welcome screen on first run, or reveal main app
+  let welcomed = false;
+  try { welcomed = localStorage.getItem(WELCOME_LS_KEY) === "1"; } catch { /* ignore */ }
+  const appEl = document.getElementById("app");
+  if (!welcomed) {
+    showWelcome();
+  }
+  // Remove boot loader and loading gate so the chosen UI is visible
+  const bootLoader = document.getElementById("boot-loader");
+  if (bootLoader) bootLoader.style.display = "none";
+  if (appEl) appEl.classList.remove("app-loading");
 });
+
+function showWelcome() {
+  const welcome = document.getElementById("welcome-screen");
+  const header = document.querySelector("header");
+  const tabBar = document.getElementById("tab-bar");
+  const main = document.querySelector("main");
+  const fillFooter = document.getElementById("actions");
+  const createFooter = document.getElementById("create-actions");
+  if (welcome) welcome.style.display = "flex";
+  if (header) header.style.display = "none";
+  if (tabBar) tabBar.style.display = "none";
+  if (main) main.style.display = "none";
+  if (fillFooter) fillFooter.style.display = "none";
+  if (createFooter) createFooter.style.display = "none";
+}
+
+function dismissWelcome() {
+  const welcome = document.getElementById("welcome-screen");
+  const header = document.querySelector("header");
+  const tabBar = document.getElementById("tab-bar");
+  const main = document.querySelector("main");
+  const fillFooter = document.getElementById("actions");
+  if (welcome) welcome.style.display = "none";
+  if (header) header.style.display = "";
+  if (tabBar) tabBar.style.display = "";
+  if (main) main.style.display = "";
+  if (fillFooter) fillFooter.style.display = "";
+  try { localStorage.setItem(WELCOME_LS_KEY, "1"); } catch { /* ignore */ }
+}
 
 // ── DocFill CC Helpers ───────────────────────────────────────────────────────
 

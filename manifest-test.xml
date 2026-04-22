@@ -8,7 +8,7 @@
   <!-- Different ID so both can be sideloaded at the same time -->
   <Id>f2f32597-ec21-45f0-bd23-e70d741ca439</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>DocFill</ProviderName>
+  <ProviderName>SMPL HQ</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="DocFill (Test)"/>
   <Description DefaultValue="LOCAL TEST BUILD -- Fill {{placeholders}} in your Word templates with a simple form."/>
